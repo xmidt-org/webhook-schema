@@ -96,7 +96,9 @@ func (deviceIDRegexMustCompileOption) String() string {
 
 // ValidateRegistrationDuration ensures that the requsted registration duration
 // of a webhook is valid.  This option checks the values set in either the
-// Duration or Until fields of the webhook. The ttl passed in must be non-negative.
+// Duration or Until fields of the webhook. If the ttl is less than or equal to
+// zero, this option will not boundary check the registration duration, but will
+// still ensure that the Duration or Until fields are set.
 func ValidateRegistrationDuration(ttl time.Duration) Option {
 	return validateRegistrationDurationOption{ttl: ttl}
 }
@@ -107,10 +109,10 @@ type validateRegistrationDurationOption struct {
 
 func (v validateRegistrationDurationOption) Validate(r *Registration) error {
 	if v.ttl <= 0 {
-		return fmt.Errorf("%w: the duration must be positive", ErrInvalidInput)
+		v.ttl = time.Duration(0)
 	}
 
-	if v.ttl < time.Duration(r.Duration) {
+	if v.ttl != 0 && v.ttl < time.Duration(r.Duration) {
 		return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
 	}
 
@@ -129,7 +131,7 @@ func (v validateRegistrationDurationOption) Validate(r *Registration) error {
 		}
 
 		now := nowFunc()
-		if r.Until.After(now.Add(v.ttl)) {
+		if v.ttl != 0 && r.Until.After(now.Add(v.ttl)) {
 			return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
 		}
 
@@ -255,4 +257,22 @@ func (p provideAlternativeURLValidatorOption) String() string {
 		return "ProvideAlternativeURLValidator(nil)"
 	}
 	return "ProvideAlternativeURLValidator(" + p.checker.String() + ")"
+}
+
+// NoUntil is an option that ensures that the Until field is not set.
+func NoUntil() Option {
+	return noUntilOption{}
+}
+
+type noUntilOption struct{}
+
+func (noUntilOption) Validate(r *Registration) error {
+	if !r.Until.IsZero() {
+		return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
+	}
+	return nil
+}
+
+func (noUntilOption) String() string {
+	return "NoUntil()"
 }

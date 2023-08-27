@@ -139,12 +139,17 @@ func TestValidateRegistrationDuration(t *testing.T) {
 			},
 			expectedErr: ErrInvalidInput,
 		}, {
-			description: "failure with max ttl out of bounds",
+			description: "success with max ttl ignored",
 			opt:         ValidateRegistrationDuration(-5 * time.Minute),
 			in: Registration{
 				Duration: CustomDuration(1 * time.Minute),
 			},
-			expectedErr: ErrInvalidInput,
+		}, {
+			description: "success with max ttl ignored, 0 duration",
+			opt:         ValidateRegistrationDuration(0),
+			in: Registration{
+				Duration: CustomDuration(1 * time.Minute),
+			},
 		}, {
 			description: "success with until in bounds",
 			opts: []Option{
@@ -193,6 +198,15 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
+		}, {
+			description: "success with until just needing to be present",
+			opts: []Option{
+				ProvideTimeNowFunc(now),
+				ValidateRegistrationDuration(0),
+			},
+			in: Registration{
+				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
+			},
 		}, {
 			description: "failure, both expirations set",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
@@ -337,6 +351,22 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 	})
 }
 
+func TestNoUntil(t *testing.T) {
+	run_tests(t, []optionTest{
+		{
+			description: "success, no until set",
+			opt:         NoUntil(),
+			str:         "NoUntil()",
+		}, {
+			description: "detect until set",
+			opt:         NoUntil(),
+			in: Registration{
+				Until: time.Now(),
+			},
+			expectedErr: ErrInvalidInput,
+		},
+	})
+}
 func run_tests(t *testing.T, tests []optionTest) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
