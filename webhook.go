@@ -20,7 +20,7 @@ type WebhookConfig struct {
 	// ContentType is content type value to set WRP messages to (unless already specified in the WRP).
 	ContentType string `json:"content_type"`
 
-	// Secret is the string value for the sha1 HMAC.
+	// Secret is the string value.
 	// (Optional, set to "" to disable behavior).
 	Secret string `json:"secret,omitempty"`
 
@@ -33,16 +33,21 @@ type WebhookConfig struct {
 
 	// SecretHash is the hash algorithm to be used. Only sha256 HMAC and sha512 HMAC are supported.
 	// (Optional).
+	// Deprecated: The Default value is the sha1 HMAC for backwards compatibility.
 	SecretHash string `json:"secret_hash"`
 
 	// Batch is the substructure for configuration related to event batching.
 	// (Optional, if omited then batches of singal events will be sent)
+	// Default value will disable batch. All zeros will also disable batch.
 	Batch struct {
 		// MaxLingerDuration is the maximum delay for batching if MaxMesasges has not been reached.
+		// Default value will set no maximum value.
 		MaxLingerDuration time.Duration `json:"max_linger_duration"`
 		// MaxMesasges is the maximum number of events that will be sent in a single batch.
+		// Default value will set no maximum value.
 		MaxMesasges int `json:"max_messages"`
-		// maxTotalBytes is the maximum batch size in kilobyte that will be sent.
+		// maxTotalBytes is the maximum batch size in bytes that will be sent.
+		// Default value will set no maximum value.
 		MaxTotalBytes int `json:"max_total_bytes"`
 	} `json:"batch"`
 
@@ -56,10 +61,12 @@ type WebhookConfig struct {
 	} `json:"dns_srv_record"`
 
 	// MaxQueueDepth is the maximum number of events that can be queued for batched requests.
+	// Default value will be the caduceus configured default value.
 	MaxQueueDepth int `json:"max_queue_depth"`
 
 	// MaxOpenRequests is the maximum number of outstanding batched event requests are allowed before
 	// blocked and additional events are queued.
+	// Default value will be the caduceus configured default value.
 	MaxOpenRequests int `json:"max_open_requests"`
 }
 
@@ -107,10 +114,10 @@ type MetadataMatcherConfig struct {
 // a webhook registration request.  The only difference between this struct and
 // the Webhook struct is the Duration field.
 type Registration struct {
-	// RegistrarName is the canonical name of the registration request.
-	// Reusing a RegistrarName will override the configurations set in that previous
-	// registration request with the same RegistrarName.
-	RegistrarName string `json:"name"`
+	// CanonicalName is the canonical name of the registration request.
+	// Reusing a CanonicalName will override the configurations set in that previous
+	// registration request with the same CanonicalName.
+	CanonicalName string `json:"canonical_name"`
 
 	// Address is the subscription request origin HTTP Address.
 	Address string `json:"registered_from_address"`
