@@ -87,12 +87,6 @@ type KafkaConfig struct {
 	// this substructures also includes auth related secrets, noted `MaxOpenRequests` will be excluded since it's already exposed
 	KafkaProducer struct{} `json:"kafka_producer"`
 
-	// MaxQueueDepth is the maximum number of events that can be queued for batched requests.
-	MaxQueueDepth int `json:"max_queue_depth"`
-
-	// MaxOpenRequests is the maximum number of outstanding batched event requests are allowed before
-	// blocked and additional events are queued.
-	MaxOpenRequests int `json:"max_open_requests"`
 }
 
 // MetadataMatcherConfig is Webhook substructure with config to match event metadata.
