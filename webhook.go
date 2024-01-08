@@ -46,9 +46,6 @@ type WebhookConfig struct {
 		// MaxMesasges is the maximum number of events that will be sent in a single batch.
 		// Default value will set no maximum value.
 		MaxMesasges int `json:"max_messages"`
-		// maxTotalBytes is the maximum batch size in bytes that will be sent.
-		// Default value will set no maximum value.
-		MaxTotalBytes int `json:"max_total_bytes"`
 	} `json:"batch"`
 
 	// DNSSrvRecord is the substructure for configuration related to load balancing.
