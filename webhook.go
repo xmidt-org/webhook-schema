@@ -60,14 +60,6 @@ type WebhookConfig struct {
 		LoadBalancingScheme string `json:"load_balancing_scheme"`
 	} `json:"dns_srv_record"`
 
-	// MaxQueueDepth is the maximum number of events that can be queued for batched requests.
-	// Default value will be the caduceus configured default value.
-	MaxQueueDepth int `json:"max_queue_depth"`
-
-	// MaxOpenRequests is the maximum number of outstanding batched event requests are allowed before
-	// blocked and additional events are queued.
-	// Default value will be the caduceus configured default value.
-	MaxOpenRequests int `json:"max_open_requests"`
 }
 
 // KafkaConfig is a Kafka substructure with data related to event delivery.
