@@ -12,6 +12,8 @@ var (
 	ErrInvalidInput = fmt.Errorf("invalid input")
 )
 
+// Deprecated: This substructure should only be used for backwards compatibility
+// matching. Use WebhookConfig instead.
 // DeliveryConfig is a Webhook substructure with data related to event delivery.
 type DeliveryConfig struct {
 	// URL is the HTTP URL to deliver messages to.
@@ -26,6 +28,53 @@ type DeliveryConfig struct {
 
 	// AlternativeURLs is a list of explicit URLs that should be round robin through on failure cases to the main URL.
 	AlternativeURLs []string `json:"alt_urls,omitempty"`
+}
+
+// WebhookConfig is a Webhook substructure with data related to event delivery.
+type WebhookConfig struct {
+	// URL is the HTTP URL to deliver messages to.
+	ReceiverURL string `json:"url"`
+
+	// Accept is content type of outgoing events. The following content types are supported, otherwise
+	// a 406 response code is returned: application/octet-stream, application/jsonl, application/msgpack.
+	Accept string `json:"accept"`
+
+	// Secret is the string value.
+	// (Optional, set to "" to disable behavior).
+	Secret string `json:"secret,omitempty"`
+
+	// AlternativeURLs is a list of explicit URLs that should be round robin through on failure cases to the main URL.
+	AlternativeURLs []string `json:"alt_urls,omitempty"`
+
+	// ID is the configured webhook's name used to map hashed events to.
+	// Refer to the Hash substructure configuration for more details.
+	ID string `json:"id"`
+
+	// SecretHash is the hash algorithm to be used. Only sha256 HMAC and sha512 HMAC are supported.
+	// (Optional).
+	// Deprecated: The Default value is the sha1 HMAC for backwards compatibility.
+	SecretHash string `json:"secret_hash"`
+
+	// BatchHints is the substructure for configuration related to event batching.
+	// (Optional, if omited then batches of singal events will be sent)
+	// Default value will disable batch. All zeros will also disable batch.
+	BatchHints struct {
+		// MaxLingerDuration is the maximum delay for batching if MaxMesasges has not been reached.
+		// Default value will set no maximum value.
+		MaxLingerDuration time.Duration `json:"max_linger_duration"`
+		// MaxMesasges is the maximum number of events that will be sent in a single batch.
+		// Default value will set no maximum value.
+		MaxMesasges int `json:"max_messages"`
+	} `json:"batch_hints"`
+
+	// DNSSrvRecord is the substructure for configuration related to load balancing.
+	DNSSrvRecord struct {
+		// FQDNs is a list of FQDNs pointing to dns srv records
+		FQDNs []string `json:"fqdns"`
+		// LoadBalancingScheme is the scheme to use for load balancing. Either the
+		// srv record attribute `weight` or `priortiy` can be used.
+		LoadBalancingScheme string `json:"load_balancing_scheme"`
+	} `json:"dns_srv_record"`
 }
 
 // MetadataMatcherConfig is Webhook substructure with config to match event metadata.
