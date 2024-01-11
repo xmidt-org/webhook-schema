@@ -32,6 +32,10 @@ type DeliveryConfig struct {
 
 // WebhookConfig is a Webhook substructure with data related to event delivery.
 type WebhookConfig struct {
+	// ID is the configured webhook's name used to map hashed events to.
+	// Refer to the Hash substructure configuration for more details.
+	ID string `json:"id"`
+
 	// Accept is content type of outgoing events. The following content types are supported, otherwise
 	// a 406 response code is returned: application/octet-stream, application/jsonl, application/msgpack.
 	Accept string `json:"accept"`
@@ -77,11 +81,35 @@ type MetadataMatcherConfig struct {
 // a webhook registration request.  The only difference between this struct and
 // the Webhook struct is the Duration field.
 type Registration struct {
+	// CanonicalName is the canonical name of the registration request.
+	// Reusing a CanonicalName will override the configurations set in that previous
+	// registration request with the same CanonicalName.
+	CanonicalName string `json:"canonical_name"`
+
 	// Address is the subscription request origin HTTP Address.
 	Address string `json:"registered_from_address"`
 
-	// Config contains data to inform how events are delivered.
+	// Deprecated: This field should only be used for backwards compatibility
+	// matching. Use ConfigWebhooks instead.
+	// Config contains data to inform how events are delivered to single url.
 	Config DeliveryConfig `json:"config"`
+
+	// Webhooks contains data to inform how events are delivered to multiple urls.
+	Webhooks []WebhookConfig `json:"webhooks"`
+
+	// Hash is a substructure for configuration related to distributing events among sinks (kafka and webhooks)
+	Hash struct {
+		// Field is the wrp field to be used for hashing.
+		// Either "device_id" or "account" can be used
+		Field string `json:"field"`
+
+		// FieldRegex is the regular expression to match `Field` type against.
+		FieldRegex string `json:"field_regex"`
+
+		// IDs is the list of configured webhooks' and kafkas' names that hashed events to be sent to.
+		// (Optional, if omited all provided `WebhookConfig` and `KafkaConfig` configurations will be used)
+		IDs []string
+	}
 
 	// FailureURL is the URL used to notify subscribers when they've been cut off due to event overflow.
 	// Optional, set to "" to disable notifications.
