@@ -32,9 +32,6 @@ type DeliveryConfig struct {
 
 // WebhookConfig is a Webhook substructure with data related to event delivery.
 type WebhookConfig struct {
-	// URL is the HTTP URL to deliver messages to.
-	ReceiverURL string `json:"url"`
-
 	// Accept is content type of outgoing events. The following content types are supported, otherwise
 	// a 406 response code is returned: application/octet-stream, application/jsonl, application/msgpack.
 	Accept string `json:"accept"`
@@ -43,16 +40,9 @@ type WebhookConfig struct {
 	// (Optional, set to "" to disable behavior).
 	Secret string `json:"secret,omitempty"`
 
-	// AlternativeURLs is a list of explicit URLs that should be round robin through on failure cases to the main URL.
-	AlternativeURLs []string `json:"alt_urls,omitempty"`
-
-	// ID is the configured webhook's name used to map hashed events to.
-	// Refer to the Hash substructure configuration for more details.
-	ID string `json:"id"`
-
 	// SecretHash is the hash algorithm to be used. Only sha256 HMAC and sha512 HMAC are supported.
 	// (Optional).
-	// Deprecated: The Default value is the sha1 HMAC for backwards compatibility.
+	// The Default value is the sha512 HMAC.
 	SecretHash string `json:"secret_hash"`
 
 	// BatchHints is the substructure for configuration related to event batching.
