@@ -75,6 +75,15 @@ type WebhookConfig struct {
 type MetadataMatcherConfig struct {
 	// DeviceID is the list of regular expressions to match device id type against.
 	DeviceID []string `json:"device_id"`
+
+	// Account is the list of regular expressions to match account type against.
+	Account []string `json:"metadata:/account"`
+
+	// Model is the list of regular expressions to match model type against.
+	Model []string `json:"metadata:/hw-model"`
+
+	// FirmwareName is the list of regular expressions to match firmware type against.
+	FirmwareName []string `json:"metadata:/fw-name"`
 }
 
 // Registration is a special struct for unmarshaling a webhook as part of
