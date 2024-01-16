@@ -115,9 +115,6 @@ type Registration struct {
 		// FieldRegex is the regular expression to match `Field` type against.
 		FieldRegex string `json:"field_regex"`
 
-		// IDs is the list of configured webhooks' and kafkas' names that hashed events to be sent to.
-		// (Optional, if omited all provided `WebhookConfig` and `KafkaConfig` configurations will be used)
-		IDs []string
 	}
 
 	// FailureURL is the URL used to notify subscribers when they've been cut off due to event overflow.
