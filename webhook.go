@@ -71,6 +71,24 @@ type WebhookConfig struct {
 	} `json:"dns_srv_record"`
 }
 
+// KafkaConfig is a Kafka substructure with data related to event delivery.
+type KafkaConfig struct {
+	// ID is the configured kafka's name used to map hashed events to.
+	// Refer to the Hash substructure configuration for more details.
+	ID string `json:"id"`
+
+	// Accept is content type value to set WRP messages to (unless already specified in the WRP).
+	Accept string `json:"accept"`
+
+	// BootstrapServers is a list of kafka broker addresses.
+	BootstrapServers []string `json:"bootstrap_servers"`
+
+	// TODO: figure out which kafka configuration substructures we want to expose to users (to be set by users)
+	// going to be based on https://pkg.go.dev/github.com/IBM/sarama#Config
+	// this substructures also includes auth related secrets, noted `MaxOpenRequests` will be excluded since it's already exposed
+	KafkaProducer struct{} `json:"kafka_producer"`
+}
+
 // MetadataMatcherConfig is Webhook substructure with config to match event metadata.
 type MetadataMatcherConfig struct {
 	// DeviceID is the list of regular expressions to match device id type against.
@@ -106,6 +124,9 @@ type Registration struct {
 	// Webhooks contains data to inform how events are delivered to multiple urls.
 	Webhooks []WebhookConfig `json:"webhooks"`
 
+	// Kafkas contains data to inform how events are delivered to multiple kafkas.
+	Kafkas []KafkaConfig `json:"kafkas"`
+
 	// Hash is a substructure for configuration related to distributing events among sinks (kafka and webhooks)
 	Hash struct {
 		// Field is the wrp field to be used for hashing.
@@ -114,7 +135,6 @@ type Registration struct {
 
 		// FieldRegex is the regular expression to match `Field` type against.
 		FieldRegex string `json:"field_regex"`
-
 	}
 
 	// FailureURL is the URL used to notify subscribers when they've been cut off due to event overflow.
