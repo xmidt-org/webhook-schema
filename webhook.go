@@ -13,7 +13,7 @@ var (
 )
 
 // Deprecated: This substructure should only be used for backwards compatibility
-// matching. Use WebhookConfig instead.
+// matching. Use Webhook instead.
 // DeliveryConfig is a Webhook substructure with data related to event delivery.
 type DeliveryConfig struct {
 	// URL is the HTTP URL to deliver messages to.
@@ -30,15 +30,54 @@ type DeliveryConfig struct {
 	AlternativeURLs []string `json:"alt_urls,omitempty"`
 }
 
-// WebhookConfig is a Webhook substructure with data related to event delivery.
-type WebhookConfig struct {
-	// ID is the configured webhook's name used to map hashed events to.
-	// Refer to the Hash substructure configuration for more details.
-	ID string `json:"id"`
+// MetadataMatcherConfig is Webhook substructure with config to match event metadata.
+type MetadataMatcherConfig struct {
+	// DeviceID is the list of regular expressions to match device id type against.
+	DeviceID []string `json:"device_id"`
+}
 
-	// Accept is content type of outgoing events. The following content types are supported, otherwise
-	// a 406 response code is returned: application/octet-stream, application/jsonl, application/msgpack.
+// Deprecated: This structure should only be used for backwards compatibility
+// matching. Use RegistrationV2 instead.
+// RegistrationV1 is a special struct for unmarshaling a webhook as part of a webhook registration request.
+type RegistrationV1 struct {
+	// Address is the subscription request origin HTTP Address.
+	Address string `json:"registered_from_address"`
+
+	// Config contains data to inform how events are delivered.
+	Config DeliveryConfig `json:"config"`
+
+	// FailureURL is the URL used to notify subscribers when they've been cut off due to event overflow.
+	// Optional, set to "" to disable notifications.
+	FailureURL string `json:"failure_url"`
+
+	// Events is the list of regular expressions to match an event type against.
+	Events []string `json:"events"`
+
+	// Matcher type contains values to match against the metadata.
+	Matcher MetadataMatcherConfig `json:"matcher,omitempty"`
+
+	// Duration describes how long the subscription lasts once added.
+	Duration CustomDuration `json:"duration"`
+
+	// Until describes the time this subscription expires.
+	Until time.Time `json:"until"`
+
+	// now is a function that returns the current time.  It is used for testing.
+	nowFunc func() time.Time `json:"-"`
+}
+
+// Webhook is a substructure with data related to event delivery.
+type Webhook struct {
+	// Accept is the encoding type of outgoing events. The following encoding types are supported, otherwise
+	// a 406 response code is returned: application/octet-stream, application/json, application/jsonl, application/msgpack.
+	// Note: An `Accept` of application/octet-stream or application/json will result in a single response for batch sizes of 0 or 1
+	// and batch sizes greater than 1 will result in a multipart response. An `Accept` of application/jsonl or application/msgpack
+	// will always result in a single response with a list of batched events for any batch size.
 	Accept string `json:"accept"`
+
+	// AcceptEncoding is the content type of outgoing events. The following content types are supported, otherwise
+	// a 406 response code is returned: gzip.
+	AcceptEncoding string `json:"accept_encoding"`
 
 	// Secret is the string value.
 	// (Optional, set to "" to disable behavior).
@@ -46,8 +85,78 @@ type WebhookConfig struct {
 
 	// SecretHash is the hash algorithm to be used. Only sha256 HMAC and sha512 HMAC are supported.
 	// (Optional).
-	// The Default value is the sha512 HMAC.
+	// The Default value is the largest sha HMAC supported, sha512 HMAC.
 	SecretHash string `json:"secret_hash"`
+
+	// ReceiverUrls is the list of receiver urls that will be used where as if the first url fails,
+	// then the second url would be used and so on.
+	// Note: either `ReceiverURLs` or `DNSSrvRecord` must be used but not both.
+	ReceiverURLs []string `json:"receiver_urls"`
+
+	// DNSSrvRecord is the substructure for configuration related to load balancing.
+	DNSSrvRecord struct {
+		// FQDNs is a list of FQDNs pointing to dns srv records
+		FQDNs []string `json:"fqdns"`
+
+		// LoadBalancingScheme is the scheme to use for load balancing. Either the
+		// srv record attribute `weight` or `priortiy` can be used.
+		LoadBalancingScheme string `json:"load_balancing_scheme"`
+	} `json:"dns_srv_record"`
+}
+
+// Kafka is a substructure with data related to event delivery.
+type Kafka struct {
+	// Accept is content type value to set WRP messages to (unless already specified in the WRP).
+	Accept string `json:"accept"`
+
+	// BootstrapServers is a list of kafka broker addresses.
+	BootstrapServers []string `json:"bootstrap_servers"`
+
+	// TODO: figure out which kafka configuration substructures we want to expose to users (to be set by users)
+	// going to be based on https://pkg.go.dev/github.com/IBM/sarama#Config
+	// this substructures also includes auth related secrets, noted `MaxOpenRequests` will be excluded since it's already exposed
+	KafkaProducer struct{} `json:"kafka_producer"`
+}
+
+// FieldRegex is a substructure with data related to regular expressions.
+type FieldRegex struct {
+	// Field is the wrp field to be used for regex.
+	// All wrp field can be used, refer to the schema for examples.
+	Field string `json:"field"`
+
+	// FieldRegex is the regular expression to match `Field` against to.
+	Regex string `json:"regex"`
+}
+
+// RegistrationV2 is a special struct for unmarshaling sink information as part of a sink registration request.
+type RegistrationV2 struct {
+	// ContactInfo contains contact information used to reach the owner of the registration.
+	ContactInfo struct {
+		Name  string `json:"name"`
+		Phone string `json:"phone"`
+		Email string `json:"email"`
+	} `json:"contact_info"`
+
+	// CanonicalName is the canonical name of the registration request.
+	// Reusing a CanonicalName will override the configurations set in that previous
+	// registration request with the same CanonicalName.
+	CanonicalName string `json:"canonical_name"`
+
+	// Address is the subscription request origin HTTP Address.
+	Address string `json:"registered_from_address"`
+
+	// Sink contains a list of either webhook or kafka registration information, not both.
+	Sinks struct {
+		// Webhooks contains data to inform how events are delivered to multiple urls.
+		Webhooks []Webhook `json:"webhooks"`
+
+		// Kafkas contains data to inform how events are delivered to multiple kafkas.
+		Kafkas []Kafka `json:"kafkas"`
+	} `json:"Sinks"`
+
+	// Hash is a substructure for configuration related to distributing events among sinks.
+	// Note. Any failures due to a bad regex feild or regex expression will result in a silent failure.
+	Hash FieldRegex `json:"hash"`
 
 	// BatchHints is the substructure for configuration related to event batching.
 	// (Optional, if omited then batches of singal events will be sent)
@@ -61,91 +170,13 @@ type WebhookConfig struct {
 		MaxMesasges int `json:"max_messages"`
 	} `json:"batch_hints"`
 
-	// DNSSrvRecord is the substructure for configuration related to load balancing.
-	DNSSrvRecord struct {
-		// FQDNs is a list of FQDNs pointing to dns srv records
-		FQDNs []string `json:"fqdns"`
-		// LoadBalancingScheme is the scheme to use for load balancing. Either the
-		// srv record attribute `weight` or `priortiy` can be used.
-		LoadBalancingScheme string `json:"load_balancing_scheme"`
-	} `json:"dns_srv_record"`
-}
-
-// KafkaConfig is a Kafka substructure with data related to event delivery.
-type KafkaConfig struct {
-	// ID is the configured kafka's name used to map hashed events to.
-	// Refer to the Hash substructure configuration for more details.
-	ID string `json:"id"`
-
-	// Accept is content type value to set WRP messages to (unless already specified in the WRP).
-	Accept string `json:"accept"`
-
-	// BootstrapServers is a list of kafka broker addresses.
-	BootstrapServers []string `json:"bootstrap_servers"`
-
-	// TODO: figure out which kafka configuration substructures we want to expose to users (to be set by users)
-	// going to be based on https://pkg.go.dev/github.com/IBM/sarama#Config
-	// this substructures also includes auth related secrets, noted `MaxOpenRequests` will be excluded since it's already exposed
-	KafkaProducer struct{} `json:"kafka_producer"`
-}
-
-// MetadataMatcherConfig is Webhook substructure with config to match event metadata.
-type MetadataMatcherConfig struct {
-	// DeviceID is the list of regular expressions to match device id type against.
-	DeviceID []string `json:"device_id"`
-
-	// Account is the list of regular expressions to match account type against.
-	Account []string `json:"metadata:/account"`
-
-	// Model is the list of regular expressions to match model type against.
-	Model []string `json:"metadata:/hw-model"`
-
-	// FirmwareName is the list of regular expressions to match firmware type against.
-	FirmwareName []string `json:"metadata:/fw-name"`
-}
-
-// Registration is a special struct for unmarshaling a webhook as part of
-// a webhook registration request.  The only difference between this struct and
-// the Webhook struct is the Duration field.
-type Registration struct {
-	// CanonicalName is the canonical name of the registration request.
-	// Reusing a CanonicalName will override the configurations set in that previous
-	// registration request with the same CanonicalName.
-	CanonicalName string `json:"canonical_name"`
-
-	// Address is the subscription request origin HTTP Address.
-	Address string `json:"registered_from_address"`
-
-	// Deprecated: This field should only be used for backwards compatibility
-	// matching. Use ConfigWebhooks instead.
-	// Config contains data to inform how events are delivered to single url.
-	Config DeliveryConfig `json:"config"`
-
-	// Webhooks contains data to inform how events are delivered to multiple urls.
-	Webhooks []WebhookConfig `json:"webhooks"`
-
-	// Kafkas contains data to inform how events are delivered to multiple kafkas.
-	Kafkas []KafkaConfig `json:"kafkas"`
-
-	// Hash is a substructure for configuration related to distributing events among sinks (kafka and webhooks)
-	Hash struct {
-		// Field is the wrp field to be used for hashing.
-		// Either "device_id" or "account" can be used
-		Field string `json:"field"`
-
-		// FieldRegex is the regular expression to match `Field` type against.
-		FieldRegex string `json:"field_regex"`
-	}
-
 	// FailureURL is the URL used to notify subscribers when they've been cut off due to event overflow.
 	// Optional, set to "" to disable notifications.
 	FailureURL string `json:"failure_url"`
 
-	// Events is the list of regular expressions to match an event type against.
-	Events []string `json:"events"`
-
-	// Matcher type contains values to match against the metadata.
-	Matcher MetadataMatcherConfig `json:"matcher,omitempty"`
+	// Matcher is the list of regular expressions to match incoming events against to.
+	// Note. Any failures due to a bad regex feild or regex expression will result in a silent failure.
+	Matcher []FieldRegex `json:"matcher,omitempty"`
 
 	// Duration describes how long the subscription lasts once added.
 	Duration CustomDuration `json:"duration"`
