@@ -64,6 +64,7 @@ type RegistrationV1 struct {
 }
 type RetryHint struct {
 	//RetryEachUrl is the amount of times a URL should be retried given a failed response until the next URL in the request is tried.
+	//Default value will be set to none
 	RetryEachUrl int `json:"retry_each_url"`
 
 	//MaxRetry is the total amount times a request will be retried.
@@ -201,10 +202,6 @@ type RegistrationV2 struct {
 	// Expires describes the time this subscription expires.
 	// TODO: list of supported formats
 	Expires time.Time `json:"expires"`
-
-	//RetryHint is the substructure for configuration related to retrying requests.
-	// (Optional, if omited then retries will be based on default values defined by server)
-	RetryHint RetryHint `json:"retry_hint"`
 }
 
 type Option interface {
