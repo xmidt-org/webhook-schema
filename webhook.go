@@ -62,6 +62,13 @@ type RegistrationV1 struct {
 	// Until describes the time this subscription expires.
 	Until time.Time `json:"until"`
 }
+type RetryHint struct {
+	//RetryEachUrl is the amount of times a URL should be retried given a failed response until the next URL in the request is tried.
+	RetryEachUrl int `json:"retry_each_url"`
+
+	//MaxRetry is the total amount times a request will be retried.
+	MaxRetry int `json:"max_retry"`
+}
 
 // Webhook is a substructure with data related to event delivery.
 type Webhook struct {
@@ -105,6 +112,10 @@ type Webhook struct {
 		// srv record attribute `weight` or `priortiy` can be used.
 		LoadBalancingScheme string `json:"load_balancing_scheme"`
 	} `json:"dns_srv_record"`
+
+	//RetryHint is the substructure for configuration related to retrying requests.
+	// (Optional, if omited then retries will be based on default values defined by server)
+	RetryHint RetryHint `json:"retry_hint"`
 }
 
 // Kafka is a substructure with data related to event delivery.
@@ -119,6 +130,10 @@ type Kafka struct {
 	// going to be based on https://pkg.go.dev/github.com/IBM/sarama#Config
 	// this substructures also includes auth related secrets, noted `MaxOpenRequests` will be excluded since it's already exposed
 	KafkaProducer struct{} `json:"kafka_producer"`
+
+	//RetryHint is the substructure for configuration related to retrying requests.
+	// (Optional, if omited then retries will be based on default values defined by server)
+	RetryHint RetryHint `json:"retry_hint"`
 }
 
 // FieldRegex is a substructure with data related to regular expressions.
@@ -186,6 +201,10 @@ type RegistrationV2 struct {
 	// Expires describes the time this subscription expires.
 	// TODO: list of supported formats
 	Expires time.Time `json:"expires"`
+
+	//RetryHint is the substructure for configuration related to retrying requests.
+	// (Optional, if omited then retries will be based on default values defined by server)
+	RetryHint RetryHint `json:"retry_hint"`
 }
 
 type Option interface {
