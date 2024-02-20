@@ -62,6 +62,7 @@ type RegistrationV1 struct {
 	// Until describes the time this subscription expires.
 	Until time.Time `json:"until"`
 }
+
 type RetryHint struct {
 	//RetryEachUrl is the amount of times a URL should be retried given a failed response until the next URL in the request is tried.
 	//Default value will be set to none
