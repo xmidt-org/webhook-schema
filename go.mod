@@ -3,7 +3,7 @@ module github.com/xmidt-org/webhook-schema
 go 1.20
 
 require (
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/xmidt-org/urlegit v0.1.1
 )
 
