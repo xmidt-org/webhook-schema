@@ -12,6 +12,12 @@ var (
 	ErrInvalidInput = fmt.Errorf("invalid input")
 )
 
+type Register interface {
+	GetId() string
+	GetPartnerIds() []string
+	GetUntil() time.Time
+}
+
 // Deprecated: This substructure should only be used for backwards compatibility
 // matching. Use Webhook instead.
 // DeliveryConfig is a Webhook substructure with data related to event delivery.
@@ -207,12 +213,12 @@ type RegistrationV2 struct {
 
 type Option interface {
 	fmt.Stringer
-	Validate(*Registration) error
+	Validate(Register) error
 }
 
 // Validate is a method on Registration that validates the registration
 // against a list of options.
-func (r *Registration) Validate(opts ...Option) error {
+func Validate(r Register, opts ...Option) error {
 	for _, opt := range opts {
 		if opt != nil {
 			if err := opt.Validate(r); err != nil {
