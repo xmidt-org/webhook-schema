@@ -4,17 +4,128 @@
 package webhook
 
 import (
+	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/urlegit"
+	"go.uber.org/multierr"
 )
+
+type MockRegistration struct {
+	Id         string
+	Until      time.Time
+	Duration   CustomDuration
+	Events     []string
+	FailureURL string
+	Config     DeliveryConfig
+	Matcher    MetadataMatcherConfig
+}
+
+func (m *MockRegistration) GetId() string {
+	return m.Id
+}
+
+func (m *MockRegistration) GetUntil() time.Time {
+	return m.Until
+}
+
+func (m *MockRegistration) ValidateOneEvent() error {
+	if len(m.Events) == 0 {
+		return fmt.Errorf("cannot have zero events")
+	}
+	return nil
+}
+
+func (m *MockRegistration) ValidateEventRegex() error {
+	for _, e := range m.Events {
+		_, err := regexp.Compile(e)
+		if err != nil {
+			return fmt.Errorf("unable to compile matching")
+		}
+	}
+	return nil
+}
+
+func (m *MockRegistration) ValidateDeviceId() error {
+	for _, e := range m.Matcher.DeviceID {
+		_, err := regexp.Compile(e)
+		if err != nil {
+			return fmt.Errorf("unable to compile matching")
+		}
+	}
+	return nil
+}
+
+func (m *MockRegistration) ValidateDuration(ttl time.Duration) error {
+	var errs error
+	if ttl != 0 && ttl < time.Duration(m.Duration) {
+		errs = multierr.Append(errs, fmt.Errorf("the registration is for too long"))
+	}
+
+	if m.Until.IsZero() && m.Duration == 0 {
+		errs = multierr.Append(errs, fmt.Errorf("either Duration or Until must be set"))
+	}
+
+	if !m.Until.IsZero() && m.Duration != 0 {
+		errs = multierr.Append(errs, fmt.Errorf("only one of Duration or Until may be set"))
+	}
+
+	if !m.Until.IsZero() {
+		nowFunc := time.Now
+		// if m.nowFunc != nil {
+		// 	nowFunc = m.nowFunc
+		// }
+
+		now := nowFunc()
+		if ttl != 0 && m.Until.After(now.Add(ttl)) {
+			errs = multierr.Append(errs, fmt.Errorf("the registration is for too long"))
+		}
+
+		if m.Until.Before(now) {
+			errs = multierr.Append(errs, fmt.Errorf("the registration has already expired"))
+		}
+	}
+
+	if errs != nil {
+		return errs
+	}
+	return nil
+}
+
+func (m *MockRegistration) ValidateURLs(c *urlegit.Checker) error {
+	var errs error
+	if m.FailureURL != "" {
+		if err := c.Text(m.FailureURL); err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("failure url is invalid"))
+		}
+	}
+
+	if m.Config.ReceiverURL != "" {
+		if err := c.Text(m.Config.ReceiverURL); err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("receiver url is invalid"))
+		}
+	}
+
+	for _, url := range m.Config.AlternativeURLs {
+		if err := c.Text(url); err != nil {
+			errs = multierr.Append(errs, fmt.Errorf("%s: alternative url is invalid", url))
+		}
+	}
+
+	if errs != nil {
+		return errs
+	}
+
+	return nil
+}
 
 type optionTest struct {
 	description string
-	in          Registration
+	in          Register
 	opt         Option
 	opts        []Option
 	str         string
@@ -43,17 +154,17 @@ func TestAtLeastOneEventOption(t *testing.T) {
 	run_tests(t, []optionTest{
 		{
 			description: "there is an event",
-			opt:         AtLeastOneEvent(),
-			in:          Registration{Events: []string{"foo"}},
+			opt:         ValidateEvents(),
+			in:          &MockRegistration{Events: []string{"foo"}},
 			str:         "AtLeastOneEvent()",
 		}, {
 			description: "multiple events",
-			opt:         AtLeastOneEvent(),
-			in:          Registration{Events: []string{"foo", "bar"}},
+			opt:         ValidateEvents(),
+			in:          &MockRegistration{Events: []string{"foo", "bar"}},
 			str:         "AtLeastOneEvent()",
 		}, {
 			description: "there are no events",
-			opt:         AtLeastOneEvent(),
+			opt:         ValidateEvents(),
 			expectedErr: ErrInvalidInput,
 		},
 	})
@@ -63,18 +174,18 @@ func TestEventRegexMustCompile(t *testing.T) {
 	run_tests(t, []optionTest{
 		{
 			description: "the regex compiles",
-			opt:         EventRegexMustCompile(),
-			in:          Registration{Events: []string{"event.*"}},
+			opt:         ValidateEvents(),
+			in:          &MockRegistration{Events: []string{"event.*"}},
 			str:         "EventRegexMustCompile()",
 		}, {
 			description: "multiple events",
-			opt:         EventRegexMustCompile(),
-			in:          Registration{Events: []string{"magic-thing", "event.*"}},
+			opt:         ValidateEvents(),
+			in:          &MockRegistration{Events: []string{"magic-thing", "event.*"}},
 			str:         "EventRegexMustCompile()",
 		}, {
 			description: "failure",
-			opt:         EventRegexMustCompile(),
-			in:          Registration{Events: []string{"("}},
+			opt:         ValidateEvents(),
+			in:          &MockRegistration{Events: []string{"("}},
 			expectedErr: ErrInvalidInput,
 		},
 	})
@@ -85,7 +196,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		{
 			description: "the regex compiles",
 			opt:         DeviceIDRegexMustCompile(),
-			in: Registration{
+			in: &MockRegistration{
 				Matcher: MetadataMatcherConfig{
 					DeviceID: []string{"device.*"},
 				},
@@ -94,7 +205,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		}, {
 			description: "multiple device ids",
 			opt:         DeviceIDRegexMustCompile(),
-			in: Registration{
+			in: &MockRegistration{
 				Matcher: MetadataMatcherConfig{
 					DeviceID: []string{"device.*", "magic-thing"},
 				},
@@ -103,7 +214,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		}, {
 			description: "failure",
 			opt:         DeviceIDRegexMustCompile(),
-			in: Registration{
+			in: &MockRegistration{
 				Matcher: MetadataMatcherConfig{
 					DeviceID: []string{"("},
 				},
@@ -121,33 +232,33 @@ func TestValidateRegistrationDuration(t *testing.T) {
 		{
 			description: "success with time in bounds",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: &MockRegistration{
 				Duration: CustomDuration(4 * time.Minute),
 			},
 			str: "ValidateRegistrationDuration(5m0s)",
 		}, {
 			description: "success with time in bounds, exactly",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: &MockRegistration{
 				Duration: CustomDuration(5 * time.Minute),
 			},
 		}, {
 			description: "failure with time out of bounds",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: &MockRegistration{
 				Duration: CustomDuration(6 * time.Minute),
 			},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "success with max ttl ignored",
 			opt:         ValidateRegistrationDuration(-5 * time.Minute),
-			in: Registration{
+			in: &MockRegistration{
 				Duration: CustomDuration(1 * time.Minute),
 			},
 		}, {
 			description: "success with max ttl ignored, 0 duration",
 			opt:         ValidateRegistrationDuration(0),
-			in: Registration{
+			in: &MockRegistration{
 				Duration: CustomDuration(1 * time.Minute),
 			},
 		}, {
@@ -156,7 +267,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(5 * time.Minute),
 			},
-			in: Registration{
+			in: &MockRegistration{
 				Until: time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC),
 			},
 		}, {
@@ -165,7 +276,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ValidateRegistrationDuration(5 * time.Minute),
 				ProvideTimeNowFunc(now),
 			},
-			in: Registration{
+			in: &MockRegistration{
 				Until: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
@@ -175,7 +286,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(5 * time.Minute),
 			},
-			in: Registration{
+			in: &MockRegistration{
 				Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC),
 			},
 		}, {
@@ -184,7 +295,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ValidateRegistrationDuration(5 * time.Minute),
 				ProvideTimeNowFunc(now),
 			},
-			in: Registration{
+			in: &MockRegistration{
 				Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
@@ -194,7 +305,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(5 * time.Minute),
 			},
-			in: Registration{
+			in: &MockRegistration{
 				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
@@ -204,13 +315,13 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(0),
 			},
-			in: Registration{
+			in: &MockRegistration{
 				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
 			},
 		}, {
 			description: "failure, both expirations set",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: &MockRegistration{
 				Duration: CustomDuration(1 * time.Minute),
 				Until:    time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC),
 			},
@@ -249,19 +360,19 @@ func TestProvideFailureURLValidator(t *testing.T) {
 	run_tests(t, []optionTest{
 		{
 			description: "success, no checker",
-			opt:         ProvideFailureURLValidator(nil),
+			opt:         ProvideURLValidator(nil),
 			str:         "ProvideFailureURLValidator(nil)",
 		}, {
 			description: "success, with checker",
-			opt:         ProvideFailureURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				FailureURL: "https://example.com",
 			},
 			str: "ProvideFailureURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker",
-			opt:         ProvideFailureURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				FailureURL: "http://example.com",
 			},
 			expectedErr: ErrInvalidInput,
@@ -277,12 +388,12 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 	run_tests(t, []optionTest{
 		{
 			description: "success, no checker",
-			opt:         ProvideReceiverURLValidator(nil),
+			opt:         ProvideURLValidator(nil),
 			str:         "ProvideReceiverURLValidator(nil)",
 		}, {
 			description: "success, with checker",
-			opt:         ProvideReceiverURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				Config: DeliveryConfig{
 					ReceiverURL: "https://example.com",
 				},
@@ -290,8 +401,8 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 			str: "ProvideReceiverURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker",
-			opt:         ProvideReceiverURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				Config: DeliveryConfig{
 					ReceiverURL: "http://example.com",
 				},
@@ -309,12 +420,12 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 	run_tests(t, []optionTest{
 		{
 			description: "success, no checker",
-			opt:         ProvideAlternativeURLValidator(nil),
+			opt:         ProvideURLValidator(nil),
 			str:         "ProvideAlternativeURLValidator(nil)",
 		}, {
 			description: "success, with checker",
-			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"https://example.com"},
 				},
@@ -322,8 +433,8 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 			str: "ProvideAlternativeURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "success, with checker and multiple urls",
-			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"https://example.com", "https://example.org"},
 				},
@@ -331,8 +442,8 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 			str: "ProvideAlternativeURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker",
-			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"http://example.com"},
 				},
@@ -340,8 +451,8 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "failure, with checker with multiple urls",
-			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			opt:         ProvideURLValidator(checker),
+			in: &MockRegistration{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"https://example.com", "http://example.com"},
 				},
@@ -360,7 +471,7 @@ func TestNoUntil(t *testing.T) {
 		}, {
 			description: "detect until set",
 			opt:         NoUntil(),
-			in: Registration{
+			in: &MockRegistration{
 				Until: time.Now(),
 			},
 			expectedErr: ErrInvalidInput,
@@ -373,7 +484,7 @@ func run_tests(t *testing.T, tests []optionTest) {
 			assert := assert.New(t)
 
 			opts := append(tc.opts, tc.opt)
-			err := tc.in.Validate(opts...)
+			err := Validate(tc.in, opts...)
 
 			assert.ErrorIs(err, tc.expectedErr)
 

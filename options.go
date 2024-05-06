@@ -5,10 +5,10 @@ package webhook
 
 import (
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/xmidt-org/urlegit"
+	"go.uber.org/multierr"
 )
 
 // Error is an option that returns an error when called.
@@ -20,7 +20,7 @@ type errorOption struct {
 	err error
 }
 
-func (e errorOption) Validate(*Registration) error {
+func (e errorOption) Validate(r Register) error {
 	return error(e.err)
 }
 
@@ -31,46 +31,38 @@ func (e errorOption) String() string {
 	return "Error('" + e.err.Error() + "')"
 }
 
-// AtLeastOneEvent makes sure there is at least one value in Events and ensures
-// that all values should parse into regex.
-func AtLeastOneEvent() Option {
-	return atLeastOneEventOption{}
+func ValidateEvents() Option {
+	return validateEvents{}
 }
 
-type atLeastOneEventOption struct{}
+type validateEvents struct{}
 
-func (atLeastOneEventOption) Validate(r *Registration) error {
-	if len(r.Events) == 0 {
-		return fmt.Errorf("%w: cannot have zero events", ErrInvalidInput)
+// AtLeastOneEvent makes sure there is at least one value in Events and ensures
+// that all values should parse into regex.
+func (validateEvents) Validate(r Register) error {
+	var errs error
+	err := r.ValidateOneEvent()
+	if err != nil {
+		errs = multierr.Append(errs, err)
+		err = nil
+	}
+
+	err = r.ValidateEventRegex()
+	if err != nil {
+		errs = multierr.Append(errs, err)
+	}
+	if errs != nil {
+		return fmt.Errorf("%w:%w", ErrInvalidInput, errs)
 	}
 
 	return nil
 }
 
-func (atLeastOneEventOption) String() string {
-	return "AtLeastOneEvent()"
+func (validateEvents) String() string {
+	return "ValidateEvents()"
 }
 
 // EventRegexMustCompile ensures that all values in Events parse into valid regex.
-func EventRegexMustCompile() Option {
-	return eventRegexMustCompileOption{}
-}
-
-type eventRegexMustCompileOption struct{}
-
-func (eventRegexMustCompileOption) Validate(r *Registration) error {
-	for _, e := range r.Events {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
-		}
-	}
-	return nil
-}
-
-func (eventRegexMustCompileOption) String() string {
-	return "EventRegexMustCompile()"
-}
 
 // DeviceIDRegexMustCompile ensures that all values in DeviceID parse into valid
 // regex.
@@ -80,12 +72,10 @@ func DeviceIDRegexMustCompile() Option {
 
 type deviceIDRegexMustCompileOption struct{}
 
-func (deviceIDRegexMustCompileOption) Validate(r *Registration) error {
-	for _, e := range r.Matcher.DeviceID {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
-		}
+func (deviceIDRegexMustCompileOption) Validate(r Register) error {
+	err := r.ValidateDeviceId()
+	if err != nil {
+		return fmt.Errorf("%w:%w", ErrInvalidInput, err)
 	}
 	return nil
 }
@@ -107,37 +97,14 @@ type validateRegistrationDurationOption struct {
 	ttl time.Duration
 }
 
-func (v validateRegistrationDurationOption) Validate(r *Registration) error {
+func (v validateRegistrationDurationOption) Validate(r Register) error {
 	if v.ttl <= 0 {
 		v.ttl = time.Duration(0)
 	}
 
-	if v.ttl != 0 && v.ttl < time.Duration(r.Duration) {
-		return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
-	}
-
-	if r.Until.IsZero() && r.Duration == 0 {
-		return fmt.Errorf("%w: either Duration or Until must be set", ErrInvalidInput)
-	}
-
-	if !r.Until.IsZero() && r.Duration != 0 {
-		return fmt.Errorf("%w: only one of Duration or Until may be set", ErrInvalidInput)
-	}
-
-	if !r.Until.IsZero() {
-		nowFunc := time.Now
-		if r.nowFunc != nil {
-			nowFunc = r.nowFunc
-		}
-
-		now := nowFunc()
-		if v.ttl != 0 && r.Until.After(now.Add(v.ttl)) {
-			return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
-		}
-
-		if r.Until.Before(now) {
-			return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
-		}
+	err := r.ValidateDuration(v.ttl)
+	if err != nil {
+		return fmt.Errorf("%w:%w", ErrInvalidInput, err)
 	}
 
 	return nil
@@ -157,8 +124,8 @@ type provideTimeNowFuncOption struct {
 	nowFunc func() time.Time
 }
 
-func (p provideTimeNowFuncOption) Validate(r *Registration) error {
-	r.nowFunc = p.nowFunc
+func (p provideTimeNowFuncOption) Validate(r Register) error {
+	// r.nowFunc = p.nowFunc
 	return nil
 }
 
@@ -171,93 +138,39 @@ func (p provideTimeNowFuncOption) String() string {
 
 // ProvideFailureURLValidator is an option that allows the caller to provide a
 // URL validator that is used to validate the FailureURL.
-func ProvideFailureURLValidator(checker *urlegit.Checker) Option {
-	return provideFailureURLValidatorOption{checker: checker}
+
+func ProvideURLValidator(checker *urlegit.Checker) Option {
+	return provideURLValidator{checker: checker}
 }
 
-type provideFailureURLValidatorOption struct {
+type provideURLValidator struct {
 	checker *urlegit.Checker
 }
 
-func (p provideFailureURLValidatorOption) Validate(r *Registration) error {
+func (p provideURLValidator) String() string {
+	if p.checker == nil {
+		return "ProvideURLValidator(nil)"
+	}
+	return "ProvideURLValidator(" + p.checker.String() + ")"
+}
+
+func (p provideURLValidator) Validate(r Register) error {
 	if p.checker == nil {
 		return nil
 	}
-
-	if r.FailureURL != "" {
-		if err := p.checker.Text(r.FailureURL); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
-		}
+	err := r.ValidateURLs(p.checker)
+	if err != nil {
+		return fmt.Errorf("%w:%w", ErrInvalidInput, err)
 	}
+
 	return nil
-}
-
-func (p provideFailureURLValidatorOption) String() string {
-	if p.checker == nil {
-		return "ProvideFailureURLValidator(nil)"
-	}
-	return "ProvideFailureURLValidator(" + p.checker.String() + ")"
 }
 
 // ProvideReceiverURLValidator is an option that allows the caller to provide a
 // URL validator that is used to validate the ReceiverURL.
-func ProvideReceiverURLValidator(checker *urlegit.Checker) Option {
-	return provideReceiverURLValidatorOption{checker: checker}
-}
-
-type provideReceiverURLValidatorOption struct {
-	checker *urlegit.Checker
-}
-
-func (p provideReceiverURLValidatorOption) Validate(r *Registration) error {
-	if p.checker == nil {
-		return nil
-	}
-
-	if r.Config.ReceiverURL != "" {
-		if err := p.checker.Text(r.Config.ReceiverURL); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
-		}
-	}
-	return nil
-}
-
-func (p provideReceiverURLValidatorOption) String() string {
-	if p.checker == nil {
-		return "ProvideReceiverURLValidator(nil)"
-	}
-	return "ProvideReceiverURLValidator(" + p.checker.String() + ")"
-}
 
 // ProvideAlternativeURLValidator is an option that allows the caller to provide
 // a URL validator that is used to validate the AlternativeURL.
-func ProvideAlternativeURLValidator(checker *urlegit.Checker) Option {
-	return provideAlternativeURLValidatorOption{checker: checker}
-}
-
-type provideAlternativeURLValidatorOption struct {
-	checker *urlegit.Checker
-}
-
-func (p provideAlternativeURLValidatorOption) Validate(r *Registration) error {
-	if p.checker == nil {
-		return nil
-	}
-
-	for _, url := range r.Config.AlternativeURLs {
-		if err := p.checker.Text(url); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
-		}
-	}
-	return nil
-}
-
-func (p provideAlternativeURLValidatorOption) String() string {
-	if p.checker == nil {
-		return "ProvideAlternativeURLValidator(nil)"
-	}
-	return "ProvideAlternativeURLValidator(" + p.checker.String() + ")"
-}
 
 // NoUntil is an option that ensures that the Until field is not set.
 func NoUntil() Option {
@@ -266,8 +179,9 @@ func NoUntil() Option {
 
 type noUntilOption struct{}
 
-func (noUntilOption) Validate(r *Registration) error {
-	if !r.Until.IsZero() {
+func (noUntilOption) Validate(r Register) error {
+	until := r.GetUntil()
+	if !until.IsZero() {
 		return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
 	}
 	return nil

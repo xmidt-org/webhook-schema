@@ -6,6 +6,8 @@ package webhook
 import (
 	"fmt"
 	"time"
+
+	"github.com/xmidt-org/urlegit"
 )
 
 var (
@@ -14,8 +16,12 @@ var (
 
 type Register interface {
 	GetId() string
-	GetPartnerIds() []string
 	GetUntil() time.Time
+	ValidateOneEvent() error
+	ValidateEventRegex() error
+	ValidateDeviceId() error
+	ValidateDuration(time.Duration) error
+	ValidateURLs(*urlegit.Checker) error
 }
 
 // Deprecated: This substructure should only be used for backwards compatibility
