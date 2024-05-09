@@ -4,18 +4,17 @@
 package webhook
 
 import (
-	"fmt"
-	"regexp"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/xmidt-org/urlegit"
-	"go.uber.org/multierr"
 )
 
 type MockRegistration struct {
+	mock.Mock
 	Id         string
 	Until      time.Time
 	Duration   CustomDuration
@@ -26,101 +25,38 @@ type MockRegistration struct {
 }
 
 func (m *MockRegistration) GetId() string {
-	return m.Id
+	args := m.Called()
+	return args.String(0)
 }
 
 func (m *MockRegistration) GetUntil() time.Time {
-	return m.Until
+	args := m.Called()
+	return args.Get(0).(time.Time)
 }
 
 func (m *MockRegistration) ValidateOneEvent() error {
-	if len(m.Events) == 0 {
-		return fmt.Errorf("cannot have zero events")
-	}
-	return nil
+	args := m.Called()
+	return args.Error(0)
 }
 
 func (m *MockRegistration) ValidateEventRegex() error {
-	for _, e := range m.Events {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("unable to compile matching")
-		}
-	}
-	return nil
+	args := m.Called()
+	return args.Error(0)
 }
 
 func (m *MockRegistration) ValidateDeviceId() error {
-	for _, e := range m.Matcher.DeviceID {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("unable to compile matching")
-		}
-	}
-	return nil
+	args := m.Called()
+	return args.Error(0)
 }
 
 func (m *MockRegistration) ValidateDuration(ttl time.Duration) error {
-	var errs error
-	if ttl != 0 && ttl < time.Duration(m.Duration) {
-		errs = multierr.Append(errs, fmt.Errorf("the registration is for too long"))
-	}
-
-	if m.Until.IsZero() && m.Duration == 0 {
-		errs = multierr.Append(errs, fmt.Errorf("either Duration or Until must be set"))
-	}
-
-	if !m.Until.IsZero() && m.Duration != 0 {
-		errs = multierr.Append(errs, fmt.Errorf("only one of Duration or Until may be set"))
-	}
-
-	if !m.Until.IsZero() {
-		nowFunc := time.Now
-		// if m.nowFunc != nil {
-		// 	nowFunc = m.nowFunc
-		// }
-
-		now := nowFunc()
-		if ttl != 0 && m.Until.After(now.Add(ttl)) {
-			errs = multierr.Append(errs, fmt.Errorf("the registration is for too long"))
-		}
-
-		if m.Until.Before(now) {
-			errs = multierr.Append(errs, fmt.Errorf("the registration has already expired"))
-		}
-	}
-
-	if errs != nil {
-		return errs
-	}
-	return nil
+	args := m.Called()
+	return args.Error(0)
 }
 
 func (m *MockRegistration) ValidateURLs(c *urlegit.Checker) error {
-	var errs error
-	if m.FailureURL != "" {
-		if err := c.Text(m.FailureURL); err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("failure url is invalid"))
-		}
-	}
-
-	if m.Config.ReceiverURL != "" {
-		if err := c.Text(m.Config.ReceiverURL); err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("receiver url is invalid"))
-		}
-	}
-
-	for _, url := range m.Config.AlternativeURLs {
-		if err := c.Text(url); err != nil {
-			errs = multierr.Append(errs, fmt.Errorf("%s: alternative url is invalid", url))
-		}
-	}
-
-	if errs != nil {
-		return errs
-	}
-
-	return nil
+	args := m.Called()
+	return args.Error(0)
 }
 
 type optionTest struct {
@@ -156,15 +92,16 @@ func TestAtLeastOneEventOption(t *testing.T) {
 			description: "there is an event",
 			opt:         ValidateEvents(),
 			in:          &MockRegistration{Events: []string{"foo"}},
-			str:         "AtLeastOneEvent()",
+			str:         "ValidateEvents()",
 		}, {
 			description: "multiple events",
 			opt:         ValidateEvents(),
 			in:          &MockRegistration{Events: []string{"foo", "bar"}},
-			str:         "AtLeastOneEvent()",
+			str:         "ValidateEvents()",
 		}, {
 			description: "there are no events",
 			opt:         ValidateEvents(),
+			in:          &MockRegistration{},
 			expectedErr: ErrInvalidInput,
 		},
 	})
@@ -176,12 +113,12 @@ func TestEventRegexMustCompile(t *testing.T) {
 			description: "the regex compiles",
 			opt:         ValidateEvents(),
 			in:          &MockRegistration{Events: []string{"event.*"}},
-			str:         "EventRegexMustCompile()",
+			str:         "ValidateEvents()",
 		}, {
 			description: "multiple events",
 			opt:         ValidateEvents(),
 			in:          &MockRegistration{Events: []string{"magic-thing", "event.*"}},
-			str:         "EventRegexMustCompile()",
+			str:         "ValidateEvents()",
 		}, {
 			description: "failure",
 			opt:         ValidateEvents(),
