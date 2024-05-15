@@ -31,6 +31,20 @@ func (e errorOption) String() string {
 	return "Error('" + e.err.Error() + "')"
 }
 
+func AlwaysValid() Option {
+	return AlwaysValidOption{}
+}
+
+type AlwaysValidOption struct{}
+
+func (a AlwaysValidOption) Validate(r Register) error {
+	return nil
+}
+
+func (a AlwaysValidOption) String() string {
+	return "alwaysValidOption"
+}
+
 func ValidateEvents() Option {
 	return validateEvents{}
 }
