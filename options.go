@@ -29,6 +29,20 @@ func (e errorOption) String() string {
 	return "Error('" + e.err.Error() + "')"
 }
 
+func AlwaysValid() Option {
+	return AlwaysValidOption{}
+}
+
+type AlwaysValidOption struct{}
+
+func (a AlwaysValidOption) Validate(val Validator) error {
+	return nil
+}
+
+func (a AlwaysValidOption) String() string {
+	return "alwaysValidOption"
+}
+
 // AtLeastOneEvent makes sure there is at least one value in Events and ensures
 // that all values should parse into regex.
 func AtLeastOneEvent() Option {

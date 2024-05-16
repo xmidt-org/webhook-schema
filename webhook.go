@@ -18,7 +18,6 @@ var (
 
 type Register interface {
 	GetId() string
-	GetPartnerIds() []string
 	GetUntil() time.Time
 }
 
