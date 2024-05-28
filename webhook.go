@@ -21,17 +21,6 @@ type Register interface {
 	GetUntil() time.Time
 }
 
-type Validator interface {
-	ValidateOneEvent() error
-	ValidateEventRegex() error
-	ValidateDeviceId() error
-	ValidateUntil() error
-	ValidateDuration(time.Duration) error
-	ValidateFailureURL(*urlegit.Checker) error
-	ValidateReceiverURL(*urlegit.Checker) error
-	ValidateAltURL(*urlegit.Checker) error
-}
-
 // Deprecated: This substructure should only be used for backwards compatibility
 // matching. Use Webhook instead.
 // DeliveryConfig is a Webhook substructure with data related to event delivery.
