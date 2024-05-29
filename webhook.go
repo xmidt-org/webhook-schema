@@ -221,7 +221,7 @@ type Option interface {
 
 // Validate is a method on Registration that validates the registration
 // against a list of options.
-func Validate(v Validator, opts ...Option) error {
+func Validate(v Validator, opts []Option) error {
 	var errs error
 	for _, opt := range opts {
 		if opt != nil {
@@ -327,9 +327,32 @@ func (v1 *RegistrationV1) ValidateAltURL(c *urlegit.Checker) error {
 	return errs
 }
 
-func (v1 *RegistrationV1) ValidateUntil() error {
+func (v1 *RegistrationV1) ValidateNoUntil() error {
 	if !v1.Until.IsZero() {
 		return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
 	}
 	return nil
+}
+
+func (v1 *RegistrationV1) ValidateUntil(jitter time.Duration, maxTTL time.Duration, now func() time.Time) error {
+	if now == nil {
+		now = time.Now
+	}
+	if maxTTL < 0 {
+		return ErrInvalidInput
+	} else if jitter < 0 {
+		return ErrInvalidInput
+	}
+
+	if v1.Until.IsZero() {
+		return nil
+	}
+	limit := (now().Add(maxTTL)).Add(jitter)
+	proposed := (v1.Until)
+	if proposed.After(limit) {
+		return fmt.Errorf("%w: %v after %v",
+			ErrInvalidInput, proposed.String(), limit.String())
+	}
+	return nil
+
 }

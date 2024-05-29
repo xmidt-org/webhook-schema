@@ -11,6 +11,7 @@ type Validator interface {
 	ValidateEventRegex() error
 	ValidateDeviceId() error
 	ValidateUntil() error
+	ValidateNoUntil() error
 	ValidateDuration(time.Duration) error
 	ValidateFailureURL(*urlegit.Checker) error
 	ValidateReceiverURL(*urlegit.Checker) error

@@ -238,7 +238,7 @@ func NoUntil() Option {
 type noUntilOption struct{}
 
 func (noUntilOption) Validate(val Validator) error {
-	if err := val.ValidateUntil(); err != nil {
+	if err := val.ValidateNoUntil(); err != nil {
 		return err
 	}
 	return nil
@@ -246,4 +246,20 @@ func (noUntilOption) Validate(val Validator) error {
 
 func (noUntilOption) String() string {
 	return "NoUntil()"
+}
+
+func Until() Option {
+	return untilOption{}
+}
+
+type untilOption struct{}
+
+func (untilOption) Validate(val Validator) error {
+	if err := val.ValidateUntil(); err != nil {
+		return err
+	}
+	return nil
+}
+func (untilOption) String() string {
+	return "Until()"
 }
