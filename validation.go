@@ -16,6 +16,7 @@ type Validator interface {
 	ValidateFailureURL(*urlegit.Checker) error
 	ValidateReceiverURL(*urlegit.Checker) error
 	ValidateAltURL(*urlegit.Checker) error
+	SetNowFunc(func() time.Time)
 }
 
 type ValidatorConfig struct {
