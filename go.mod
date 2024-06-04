@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/stretchr/testify v1.9.0
-	github.com/xmidt-org/urlegit v0.1.3
+	github.com/xmidt-org/urlegit v0.1.4
 )
 
 require (
