@@ -4,8 +4,6 @@
 package webhook
 
 import (
-	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/xmidt-org/urlegit"
@@ -20,7 +18,7 @@ type errorOption struct {
 	err error
 }
 
-func (e errorOption) Validate(*Registration) error {
+func (e errorOption) Validate(Validator) error {
 	return error(e.err)
 }
 
@@ -31,6 +29,20 @@ func (e errorOption) String() string {
 	return "Error('" + e.err.Error() + "')"
 }
 
+func AlwaysValid() Option {
+	return AlwaysValidOption{}
+}
+
+type AlwaysValidOption struct{}
+
+func (a AlwaysValidOption) Validate(val Validator) error {
+	return nil
+}
+
+func (a AlwaysValidOption) String() string {
+	return "alwaysValidOption"
+}
+
 // AtLeastOneEvent makes sure there is at least one value in Events and ensures
 // that all values should parse into regex.
 func AtLeastOneEvent() Option {
@@ -39,9 +51,9 @@ func AtLeastOneEvent() Option {
 
 type atLeastOneEventOption struct{}
 
-func (atLeastOneEventOption) Validate(r *Registration) error {
-	if len(r.Events) == 0 {
-		return fmt.Errorf("%w: cannot have zero events", ErrInvalidInput)
+func (atLeastOneEventOption) Validate(val Validator) error {
+	if err := val.ValidateOneEvent(); err != nil {
+		return err
 	}
 
 	return nil
@@ -58,12 +70,9 @@ func EventRegexMustCompile() Option {
 
 type eventRegexMustCompileOption struct{}
 
-func (eventRegexMustCompileOption) Validate(r *Registration) error {
-	for _, e := range r.Events {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
-		}
+func (eventRegexMustCompileOption) Validate(val Validator) error {
+	if err := val.ValidateEventRegex(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -80,12 +89,9 @@ func DeviceIDRegexMustCompile() Option {
 
 type deviceIDRegexMustCompileOption struct{}
 
-func (deviceIDRegexMustCompileOption) Validate(r *Registration) error {
-	for _, e := range r.Matcher.DeviceID {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
-		}
+func (deviceIDRegexMustCompileOption) Validate(val Validator) error {
+	if err := val.ValidateDeviceId(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -107,39 +113,10 @@ type validateRegistrationDurationOption struct {
 	ttl time.Duration
 }
 
-func (v validateRegistrationDurationOption) Validate(r *Registration) error {
-	if v.ttl <= 0 {
-		v.ttl = time.Duration(0)
+func (v validateRegistrationDurationOption) Validate(val Validator) error {
+	if err := val.ValidateDuration(v.ttl); err != nil {
+		return err
 	}
-
-	if v.ttl != 0 && v.ttl < time.Duration(r.Duration) {
-		return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
-	}
-
-	if r.Until.IsZero() && r.Duration == 0 {
-		return fmt.Errorf("%w: either Duration or Until must be set", ErrInvalidInput)
-	}
-
-	if !r.Until.IsZero() && r.Duration != 0 {
-		return fmt.Errorf("%w: only one of Duration or Until may be set", ErrInvalidInput)
-	}
-
-	if !r.Until.IsZero() {
-		nowFunc := time.Now
-		if r.nowFunc != nil {
-			nowFunc = r.nowFunc
-		}
-
-		now := nowFunc()
-		if v.ttl != 0 && r.Until.After(now.Add(v.ttl)) {
-			return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
-		}
-
-		if r.Until.Before(now) {
-			return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
-		}
-	}
-
 	return nil
 }
 
@@ -157,8 +134,8 @@ type provideTimeNowFuncOption struct {
 	nowFunc func() time.Time
 }
 
-func (p provideTimeNowFuncOption) Validate(r *Registration) error {
-	r.nowFunc = p.nowFunc
+func (p provideTimeNowFuncOption) Validate(val Validator) error {
+	val.SetNowFunc(p.nowFunc)
 	return nil
 }
 
@@ -179,15 +156,13 @@ type provideFailureURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideFailureURLValidatorOption) Validate(r *Registration) error {
+func (p provideFailureURLValidatorOption) Validate(v Validator) error {
 	if p.checker == nil {
 		return nil
 	}
 
-	if r.FailureURL != "" {
-		if err := p.checker.Text(r.FailureURL); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
-		}
+	if err := v.ValidateFailureURL(p.checker); err != nil {
+		return err
 	}
 	return nil
 }
@@ -209,16 +184,14 @@ type provideReceiverURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideReceiverURLValidatorOption) Validate(r *Registration) error {
+func (p provideReceiverURLValidatorOption) Validate(val Validator) error {
 	if p.checker == nil {
 		return nil
 	}
-
-	if r.Config.ReceiverURL != "" {
-		if err := p.checker.Text(r.Config.ReceiverURL); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
-		}
+	if err := val.ValidateReceiverURL(p.checker); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -239,15 +212,13 @@ type provideAlternativeURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideAlternativeURLValidatorOption) Validate(r *Registration) error {
+func (p provideAlternativeURLValidatorOption) Validate(val Validator) error {
 	if p.checker == nil {
 		return nil
 	}
 
-	for _, url := range r.Config.AlternativeURLs {
-		if err := p.checker.Text(url); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
-		}
+	if err := val.ValidateAltURL(p.checker); err != nil {
+		return err
 	}
 	return nil
 }
@@ -266,13 +237,37 @@ func NoUntil() Option {
 
 type noUntilOption struct{}
 
-func (noUntilOption) Validate(r *Registration) error {
-	if !r.Until.IsZero() {
-		return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
+func (noUntilOption) Validate(val Validator) error {
+	if err := val.ValidateNoUntil(); err != nil {
+		return err
 	}
 	return nil
 }
 
 func (noUntilOption) String() string {
 	return "NoUntil()"
+}
+
+func Until(j time.Duration, m time.Duration, now func() time.Time) Option {
+	return untilOption{
+		jitter: j,
+		max:    m,
+		now:    now,
+	}
+}
+
+type untilOption struct {
+	jitter time.Duration
+	max    time.Duration
+	now    func() time.Time
+}
+
+func (u untilOption) Validate(val Validator) error {
+	if err := val.ValidateUntil(u.jitter, u.max, u.now); err != nil {
+		return err
+	}
+	return nil
+}
+func (untilOption) String() string {
+	return "Until()"
 }
