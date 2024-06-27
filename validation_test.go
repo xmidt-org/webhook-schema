@@ -177,7 +177,7 @@ func TestValidatePass(t *testing.T) {
 			}
 			opts := []Option{AtLeastOneEvent(), EventRegexMustCompile(), DeviceIDRegexMustCompile(), ValidateRegistrationDuration(tc.max), ProvideAlternativeURLValidator(checker), ProvideFailureURLValidator(checker), ProvideReceiverURLValidator(checker)}
 			err = Validate(tc.v, opts)
-			assert.Nil(t, err, fmt.Errorf("received '%v' when nil was expected", err))
+			assert.NoError(t, err, fmt.Errorf("received '%v' when nil was expected", err))
 
 		})
 	}
@@ -191,7 +191,7 @@ func TestValidateFail(t *testing.T) {
 		max         time.Duration
 		config      ValidatorConfig
 		ifChecker   bool
-		expectedErr error
+		expectedErr string
 	}{
 		{
 			description: "regV1 no events",
@@ -199,7 +199,7 @@ func TestValidateFail(t *testing.T) {
 				Events: []string{},
 			},
 			opts:        []Option{AtLeastOneEvent()},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "cannot have zero events",
 		},
 		{
 			description: "regV1 invalid event regext",
@@ -207,7 +207,7 @@ func TestValidateFail(t *testing.T) {
 				Events: []string{`\M`},
 			},
 			opts:        []Option{EventRegexMustCompile()},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "unable to compile matching",
 		},
 		{
 			description: "regV1 invalid device id regex",
@@ -216,14 +216,14 @@ func TestValidateFail(t *testing.T) {
 					DeviceID: []string{"", `\M`}},
 			},
 			opts:        []Option{DeviceIDRegexMustCompile()},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "unable to compile matching",
 		},
 		{
 			description: "regV1 invalid duration - ttl < time.Duration",
 			v: &RegistrationV1{
 				Duration: CustomDuration(5),
 			},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "the registration is for too long",
 			opts:        []Option{ValidateRegistrationDuration(time.Duration(3))},
 		},
 		{
@@ -232,7 +232,7 @@ func TestValidateFail(t *testing.T) {
 				Duration: CustomDuration(5),
 				Until:    time.Now(),
 			},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "only one of Duration or Until may be set",
 			opts:        []Option{ValidateRegistrationDuration(time.Duration(10))},
 		},
 		{
@@ -240,7 +240,7 @@ func TestValidateFail(t *testing.T) {
 			v: &RegistrationV1{
 				Duration: CustomDuration(0),
 			},
-			expectedErr: ErrInvalidInput,
+			expectedErr: " either Duration or Until must be set",
 			opts:        []Option{ValidateRegistrationDuration(time.Duration(10))},
 		},
 		{
@@ -248,7 +248,7 @@ func TestValidateFail(t *testing.T) {
 			v: &RegistrationV1{
 				Until: time.Date(2024, 06, 11, 9, 50, 0, 0, time.UTC),
 			},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "the registration has already expired",
 			opts:        []Option{ValidateRegistrationDuration(time.Duration(10))},
 		},
 		{
@@ -256,7 +256,7 @@ func TestValidateFail(t *testing.T) {
 			v: &RegistrationV1{
 				Until: time.Now().Add(time.Minute * 15),
 			},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "the registration is for too long",
 			opts:        []Option{ValidateRegistrationDuration(time.Duration(10))},
 		},
 		{
@@ -265,16 +265,15 @@ func TestValidateFail(t *testing.T) {
 				Until: time.Now().Add(time.Minute * 15),
 			},
 			opts:        []Option{NoUntil()},
-			expectedErr: ErrInvalidInput,
+			expectedErr: "Until is not allowed",
 		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			err := Validate(tc.v, tc.opts)
 			assert.NotNil(t, err, fmt.Errorf("expected an err - received Nil"))
-			assert.True(t, errors.Is(err, tc.expectedErr),
-				fmt.Errorf("error [%v] doesn't contain error [%v] in its err chain",
-					err, tc.expectedErr))
+			assert.ErrorContains(t, err, tc.expectedErr, fmt.Errorf("error [%v] doesn't contain error [%v] in its err chain", err, tc.expectedErr))
+
 		})
 	}
 }
@@ -338,18 +337,19 @@ func TestValidateUnil(t *testing.T) {
 		t.Run(tc.description, func(t *testing.T) {
 			err := tc.v.ValidateUntil(tc.jitter, tc.max, tc.now)
 			if tc.expectedErr != nil {
-				assert.NotNil(t, err)
+				assert.Error(t, err, fmt.Errorf("expected err"))
 				assert.True(t, errors.Is(err, tc.expectedErr),
 					fmt.Errorf("error [%v] doesn't contain error [%v] in its err chain",
 						err, tc.expectedErr))
 			} else {
-				assert.Nil(t, err)
+				assert.NoError(t, err, fmt.Errorf("expected no error but received [%v]", err))
 			}
 		})
 	}
 }
 
 func TestSetNowFunc(t *testing.T) {
+	//TODO: add in function for regV2?
 	v1 := &RegistrationV1{}
 	// v2 := &RegistrationV2{}
 
@@ -364,7 +364,7 @@ func TestValidateFailureURL(t *testing.T) {
 		description string
 		v           Validator
 		config      ValidatorConfig
-		expectedErr bool
+		expectedErr string
 	}{
 		{
 			description: "valid failure URL",
@@ -382,7 +382,6 @@ func TestValidateFailureURL(t *testing.T) {
 					InvalidSubnets:       []string{"192.168.0.0/16"},
 				},
 			},
-			expectedErr: false,
 		},
 		{
 			description: "invalid failure URL",
@@ -400,7 +399,7 @@ func TestValidateFailureURL(t *testing.T) {
 					InvalidSubnets:       []string{"192.168.0.0/16"},
 				},
 			},
-			expectedErr: true,
+			expectedErr: "failure url is invalid",
 		},
 	}
 
@@ -410,8 +409,8 @@ func TestValidateFailureURL(t *testing.T) {
 			assert.NoError(t, err)
 
 			err = tc.v.ValidateFailureURL(checker)
-			if tc.expectedErr {
-				assert.NotNil(t, err)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -424,7 +423,7 @@ func TestValidateReceiverURL(t *testing.T) {
 		description string
 		v           Validator
 		config      ValidatorConfig
-		expectedErr bool
+		expectedErr string
 	}{
 		{
 			description: "valid receiver URL",
@@ -444,7 +443,6 @@ func TestValidateReceiverURL(t *testing.T) {
 					InvalidSubnets:       []string{"192.168.0.0/16"},
 				},
 			},
-			expectedErr: false,
 		},
 		{
 			description: "invalid receiver URL",
@@ -464,7 +462,7 @@ func TestValidateReceiverURL(t *testing.T) {
 					InvalidSubnets:       []string{"192.168.0.0/16"},
 				},
 			},
-			expectedErr: true,
+			expectedErr: "receiver url is invalid",
 		},
 	}
 
@@ -474,8 +472,8 @@ func TestValidateReceiverURL(t *testing.T) {
 			assert.NoError(t, err)
 
 			err = tc.v.ValidateReceiverURL(checker)
-			if tc.expectedErr {
-				assert.NotNil(t, err)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
 				assert.NoError(t, err)
 			}
@@ -488,7 +486,7 @@ func TestValidateAltURL(t *testing.T) {
 		description string
 		v           Validator
 		config      ValidatorConfig
-		expectedErr bool
+		expectedErr string
 	}{
 		{
 			description: "valid alternative URL",
@@ -508,7 +506,6 @@ func TestValidateAltURL(t *testing.T) {
 					InvalidSubnets:       []string{"192.168.0.0/16"},
 				},
 			},
-			expectedErr: false,
 		},
 		{
 			description: "invalid alternative URL",
@@ -528,7 +525,7 @@ func TestValidateAltURL(t *testing.T) {
 					InvalidSubnets:       []string{"192.168.0.0/16"},
 				},
 			},
-			expectedErr: true,
+			expectedErr: "alternative url is invalid",
 		},
 	}
 
@@ -538,8 +535,8 @@ func TestValidateAltURL(t *testing.T) {
 			assert.NoError(t, err)
 
 			err = tc.v.ValidateAltURL(checker)
-			if tc.expectedErr {
-				assert.NotNil(t, err)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
 				assert.NoError(t, err)
 			}

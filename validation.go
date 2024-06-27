@@ -203,7 +203,7 @@ func (v1 *RegistrationV1) ValidateFailureURL(c *urlegit.Checker) error {
 func (v1 *RegistrationV1) ValidateReceiverURL(c *urlegit.Checker) error {
 	if v1.Config.ReceiverURL != "" {
 		if err := c.Text(v1.Config.ReceiverURL); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
+			return fmt.Errorf("%w: receiver url is invalid", ErrInvalidInput)
 		}
 	}
 	return nil
@@ -213,7 +213,7 @@ func (v1 *RegistrationV1) ValidateAltURL(c *urlegit.Checker) error {
 	var errs error
 	for _, url := range v1.Config.AlternativeURLs {
 		if err := c.Text(url); err != nil {
-			errs = errors.Join(errs, fmt.Errorf("%w: failure url is invalid", ErrInvalidInput))
+			errs = errors.Join(errs, fmt.Errorf("%w: alternative url is invalid: %v", ErrInvalidInput, url))
 		}
 	}
 	return errs
