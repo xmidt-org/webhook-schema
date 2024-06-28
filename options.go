@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"time"
@@ -20,7 +21,7 @@ type errorOption struct {
 	err error
 }
 
-func (e errorOption) Validate(*Registration) error {
+func (e errorOption) Validate(any) error {
 	return error(e.err)
 }
 
@@ -39,9 +40,20 @@ func AtLeastOneEvent() Option {
 
 type atLeastOneEventOption struct{}
 
-func (atLeastOneEventOption) Validate(r *Registration) error {
-	if len(r.Events) == 0 {
-		return fmt.Errorf("%w: cannot have zero events", ErrInvalidInput)
+func (atLeastOneEventOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if len(r.Events) == 0 {
+			return fmt.Errorf("%w: cannot have zero events", ErrInvalidInput)
+		}
+	case *RegistrationV2:
+		{
+			if len(r.Matcher) == 0 {
+				return fmt.Errorf("%w: must have Matcher for events", ErrInvalidInput)
+			}
+		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
 
 	return nil
@@ -58,13 +70,26 @@ func EventRegexMustCompile() Option {
 
 type eventRegexMustCompileOption struct{}
 
-func (eventRegexMustCompileOption) Validate(r *Registration) error {
-	for _, e := range r.Events {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+func (eventRegexMustCompileOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		for _, e := range r.Events {
+			_, err := regexp.Compile(e)
+			if err != nil {
+				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+			}
 		}
+	case *RegistrationV2:
+		for _, m := range r.Matcher {
+			_, err := regexp.Compile(m.Regex)
+			if err != nil {
+				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+			}
+		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -80,13 +105,21 @@ func DeviceIDRegexMustCompile() Option {
 
 type deviceIDRegexMustCompileOption struct{}
 
-func (deviceIDRegexMustCompileOption) Validate(r *Registration) error {
-	for _, e := range r.Matcher.DeviceID {
-		_, err := regexp.Compile(e)
-		if err != nil {
-			return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+func (deviceIDRegexMustCompileOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		for _, e := range r.Matcher.DeviceID {
+			_, err := regexp.Compile(e)
+			if err != nil {
+				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+			}
 		}
+	case *RegistrationV2:
+		//Matcher description is for Events. Are we not matching for DeviceId in Reg2?
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -107,37 +140,47 @@ type validateRegistrationDurationOption struct {
 	ttl time.Duration
 }
 
-func (v validateRegistrationDurationOption) Validate(r *Registration) error {
-	if v.ttl <= 0 {
-		v.ttl = time.Duration(0)
-	}
-
-	if v.ttl != 0 && v.ttl < time.Duration(r.Duration) {
-		return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
-	}
-
-	if r.Until.IsZero() && r.Duration == 0 {
-		return fmt.Errorf("%w: either Duration or Until must be set", ErrInvalidInput)
-	}
-
-	if !r.Until.IsZero() && r.Duration != 0 {
-		return fmt.Errorf("%w: only one of Duration or Until may be set", ErrInvalidInput)
-	}
-
-	if !r.Until.IsZero() {
-		nowFunc := time.Now
-		if r.nowFunc != nil {
-			nowFunc = r.nowFunc
+func (v validateRegistrationDurationOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if v.ttl <= 0 {
+			v.ttl = time.Duration(0)
 		}
 
-		now := nowFunc()
-		if v.ttl != 0 && r.Until.After(now.Add(v.ttl)) {
+		if v.ttl != 0 && v.ttl < time.Duration(r.Duration) {
 			return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
 		}
 
-		if r.Until.Before(now) {
+		if r.Until.IsZero() && r.Duration == 0 {
+			return fmt.Errorf("%w: either Duration or Until must be set", ErrInvalidInput)
+		}
+
+		if !r.Until.IsZero() && r.Duration != 0 {
+			return fmt.Errorf("%w: only one of Duration or Until may be set", ErrInvalidInput)
+		}
+
+		if !r.Until.IsZero() {
+			nowFunc := time.Now
+			if r.nowFunc != nil {
+				nowFunc = r.nowFunc
+			}
+
+			now := nowFunc()
+			if v.ttl != 0 && r.Until.After(now.Add(v.ttl)) {
+				return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
+			}
+
+			if r.Until.Before(now) {
+				return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
+			}
+		}
+	case *RegistrationV2:
+		now := time.Now()
+		if now.After(r.Expires) {
 			return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
 		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
 
 	return nil
@@ -157,8 +200,16 @@ type provideTimeNowFuncOption struct {
 	nowFunc func() time.Time
 }
 
-func (p provideTimeNowFuncOption) Validate(r *Registration) error {
-	r.nowFunc = p.nowFunc
+func (p provideTimeNowFuncOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		r.nowFunc = p.nowFunc
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not have nowFunc.", ErrInvalidOption)
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1", ErrInvalidType)
+	}
+
 	return nil
 }
 
@@ -179,13 +230,23 @@ type provideFailureURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideFailureURLValidatorOption) Validate(r *Registration) error {
+func (p provideFailureURLValidatorOption) Validate(i any) error {
+	var failureURL string
 	if p.checker == nil {
 		return nil
 	}
 
-	if r.FailureURL != "" {
-		if err := p.checker.Text(r.FailureURL); err != nil {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		failureURL = r.FailureURL
+	case *RegistrationV2:
+		failureURL = r.FailureURL
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+	}
+
+	if failureURL != "" {
+		if err := p.checker.Text(failureURL); err != nil {
 			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
 		}
 	}
@@ -209,16 +270,36 @@ type provideReceiverURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideReceiverURLValidatorOption) Validate(r *Registration) error {
+func (p provideReceiverURLValidatorOption) Validate(i any) error {
 	if p.checker == nil {
 		return nil
 	}
 
-	if r.Config.ReceiverURL != "" {
-		if err := p.checker.Text(r.Config.ReceiverURL); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if r.Config.ReceiverURL != "" {
+			if err := p.checker.Text(r.Config.ReceiverURL); err != nil {
+				return fmt.Errorf("%w: receiver url is invalid", ErrInvalidInput)
+			}
 		}
+	case *RegistrationV2:
+		var errs error
+		for _, w := range r.Webhooks {
+			for _, url := range w.ReceiverURLs {
+				if url != "" {
+					if err := p.checker.Text(url); err != nil {
+						errs = errors.Join(errs, fmt.Errorf("%w: receiver url [%v] is invalid for webhook [%v]", ErrInvalidInput, url, w))
+					}
+				}
+			}
+		}
+		if errs != nil {
+			return errs
+		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -239,7 +320,7 @@ type provideAlternativeURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideAlternativeURLValidatorOption) Validate(r *Registration) error {
+func (p provideAlternativeURLValidatorOption) Validate(i any) error {
 	if p.checker == nil {
 		return nil
 	}

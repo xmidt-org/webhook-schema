@@ -4,12 +4,15 @@
 package webhook
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
 
 var (
-	ErrInvalidInput = fmt.Errorf("invalid input")
+	ErrInvalidInput  = fmt.Errorf("invalid input")
+	ErrInvalidType   = fmt.Errorf("invalid type")
+	ErrInvalidOption = fmt.Errorf("invalid validation option")
 )
 
 // Deprecated: This substructure should only be used for backwards compatibility
@@ -61,6 +64,9 @@ type RegistrationV1 struct {
 
 	// Until describes the time this subscription expires.
 	Until time.Time `json:"until"`
+
+	// now is a function that returns the current time.  It is used for testing.
+	nowFunc func() time.Time `json:"-"`
 }
 
 type RetryHint struct {
@@ -197,7 +203,7 @@ type RegistrationV2 struct {
 	FailureURL string `json:"failure_url"`
 
 	// Matcher is the list of regular expressions to match incoming events against to.
-	// Note. Any failures due to a bad regex feild or regex expression will result in a silent failure.
+	// Note. Any failures due to a bad regex field or regex expression will result in a silent failure.
 	Matcher []FieldRegex `json:"matcher,omitempty"`
 
 	// Expires describes the time this subscription expires.
@@ -207,18 +213,19 @@ type RegistrationV2 struct {
 
 type Option interface {
 	fmt.Stringer
-	Validate(*Registration) error
+	Validate(any) error
 }
 
-// Validate is a method on Registration that validates the registration
+// Validate is a method that validates the registration
 // against a list of options.
-func (r *Registration) Validate(opts ...Option) error {
+func Validate[R RegistrationV1 | RegistrationV2](r R, opts ...Option) error {
+	var errs error
 	for _, opt := range opts {
 		if opt != nil {
 			if err := opt.Validate(r); err != nil {
-				return err
+				errs = errors.Join(errs, err)
 			}
 		}
 	}
-	return nil
+	return errs
 }
