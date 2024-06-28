@@ -325,11 +325,23 @@ func (p provideAlternativeURLValidatorOption) Validate(i any) error {
 		return nil
 	}
 
-	for _, url := range r.Config.AlternativeURLs {
-		if err := p.checker.Text(url); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
+	switch r := i.(type) {
+	case *RegistrationV1:
+		var errs error
+		for _, url := range r.Config.AlternativeURLs {
+			if err := p.checker.Text(url); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("%w: alternative url [%v] is invalid", ErrInvalidInput, url))
+			}
 		}
+		if errs != nil {
+			return errs
+		}
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not use alternative urls. Use ProvideReceiverURLValidator() to validate non-failure urls", ErrInvalidOption)
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -347,10 +359,19 @@ func NoUntil() Option {
 
 type noUntilOption struct{}
 
-func (noUntilOption) Validate(r *Registration) error {
-	if !r.Until.IsZero() {
-		return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
+func (noUntilOption) Validate(i any) error {
+
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if !r.Until.IsZero() {
+			return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
+		}
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidOption)
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 

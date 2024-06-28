@@ -14,7 +14,7 @@ import (
 
 type optionTest struct {
 	description string
-	in          Registration
+	in          any
 	opt         Option
 	opts        []Option
 	str         string
@@ -44,12 +44,12 @@ func TestAtLeastOneEventOption(t *testing.T) {
 		{
 			description: "there is an event",
 			opt:         AtLeastOneEvent(),
-			in:          Registration{Events: []string{"foo"}},
+			in:          RegistrationV1{Events: []string{"foo"}},
 			str:         "AtLeastOneEvent()",
 		}, {
 			description: "multiple events",
 			opt:         AtLeastOneEvent(),
-			in:          Registration{Events: []string{"foo", "bar"}},
+			in:          RegistrationV1{Events: []string{"foo", "bar"}},
 			str:         "AtLeastOneEvent()",
 		}, {
 			description: "there are no events",
@@ -64,17 +64,17 @@ func TestEventRegexMustCompile(t *testing.T) {
 		{
 			description: "the regex compiles",
 			opt:         EventRegexMustCompile(),
-			in:          Registration{Events: []string{"event.*"}},
+			in:          RegistrationV1{Events: []string{"event.*"}},
 			str:         "EventRegexMustCompile()",
 		}, {
 			description: "multiple events",
 			opt:         EventRegexMustCompile(),
-			in:          Registration{Events: []string{"magic-thing", "event.*"}},
+			in:          RegistrationV1{Events: []string{"magic-thing", "event.*"}},
 			str:         "EventRegexMustCompile()",
 		}, {
 			description: "failure",
 			opt:         EventRegexMustCompile(),
-			in:          Registration{Events: []string{"("}},
+			in:          RegistrationV1{Events: []string{"("}},
 			expectedErr: ErrInvalidInput,
 		},
 	})
@@ -85,7 +85,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		{
 			description: "the regex compiles",
 			opt:         DeviceIDRegexMustCompile(),
-			in: Registration{
+			in: RegistrationV1{
 				Matcher: MetadataMatcherConfig{
 					DeviceID: []string{"device.*"},
 				},
@@ -94,7 +94,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		}, {
 			description: "multiple device ids",
 			opt:         DeviceIDRegexMustCompile(),
-			in: Registration{
+			in: RegistrationV1{
 				Matcher: MetadataMatcherConfig{
 					DeviceID: []string{"device.*", "magic-thing"},
 				},
@@ -103,7 +103,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		}, {
 			description: "failure",
 			opt:         DeviceIDRegexMustCompile(),
-			in: Registration{
+			in: RegistrationV1{
 				Matcher: MetadataMatcherConfig{
 					DeviceID: []string{"("},
 				},
@@ -121,33 +121,33 @@ func TestValidateRegistrationDuration(t *testing.T) {
 		{
 			description: "success with time in bounds",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: RegistrationV1{
 				Duration: CustomDuration(4 * time.Minute),
 			},
 			str: "ValidateRegistrationDuration(5m0s)",
 		}, {
 			description: "success with time in bounds, exactly",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: RegistrationV1{
 				Duration: CustomDuration(5 * time.Minute),
 			},
 		}, {
 			description: "failure with time out of bounds",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: RegistrationV1{
 				Duration: CustomDuration(6 * time.Minute),
 			},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "success with max ttl ignored",
 			opt:         ValidateRegistrationDuration(-5 * time.Minute),
-			in: Registration{
+			in: RegistrationV1{
 				Duration: CustomDuration(1 * time.Minute),
 			},
 		}, {
 			description: "success with max ttl ignored, 0 duration",
 			opt:         ValidateRegistrationDuration(0),
-			in: Registration{
+			in: RegistrationV1{
 				Duration: CustomDuration(1 * time.Minute),
 			},
 		}, {
@@ -156,7 +156,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(5 * time.Minute),
 			},
-			in: Registration{
+			in: RegistrationV1{
 				Until: time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC),
 			},
 		}, {
@@ -165,7 +165,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ValidateRegistrationDuration(5 * time.Minute),
 				ProvideTimeNowFunc(now),
 			},
-			in: Registration{
+			in: RegistrationV1{
 				Until: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
@@ -175,7 +175,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(5 * time.Minute),
 			},
-			in: Registration{
+			in: RegistrationV1{
 				Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC),
 			},
 		}, {
@@ -184,7 +184,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ValidateRegistrationDuration(5 * time.Minute),
 				ProvideTimeNowFunc(now),
 			},
-			in: Registration{
+			in: RegistrationV1{
 				Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
@@ -194,7 +194,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(5 * time.Minute),
 			},
-			in: Registration{
+			in: RegistrationV1{
 				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
@@ -204,13 +204,13 @@ func TestValidateRegistrationDuration(t *testing.T) {
 				ProvideTimeNowFunc(now),
 				ValidateRegistrationDuration(0),
 			},
-			in: Registration{
+			in: RegistrationV1{
 				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
 			},
 		}, {
 			description: "failure, both expirations set",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: Registration{
+			in: RegistrationV1{
 				Duration: CustomDuration(1 * time.Minute),
 				Until:    time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC),
 			},
@@ -254,14 +254,14 @@ func TestProvideFailureURLValidator(t *testing.T) {
 		}, {
 			description: "success, with checker",
 			opt:         ProvideFailureURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				FailureURL: "https://example.com",
 			},
 			str: "ProvideFailureURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker",
 			opt:         ProvideFailureURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				FailureURL: "http://example.com",
 			},
 			expectedErr: ErrInvalidInput,
@@ -282,7 +282,7 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 		}, {
 			description: "success, with checker",
 			opt:         ProvideReceiverURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				Config: DeliveryConfig{
 					ReceiverURL: "https://example.com",
 				},
@@ -291,7 +291,7 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 		}, {
 			description: "failure, with checker",
 			opt:         ProvideReceiverURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				Config: DeliveryConfig{
 					ReceiverURL: "http://example.com",
 				},
@@ -314,7 +314,7 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 		}, {
 			description: "success, with checker",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"https://example.com"},
 				},
@@ -323,7 +323,7 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 		}, {
 			description: "success, with checker and multiple urls",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"https://example.com", "https://example.org"},
 				},
@@ -332,7 +332,7 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 		}, {
 			description: "failure, with checker",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"http://example.com"},
 				},
@@ -341,7 +341,7 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 		}, {
 			description: "failure, with checker with multiple urls",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: Registration{
+			in: RegistrationV1{
 				Config: DeliveryConfig{
 					AlternativeURLs: []string{"https://example.com", "http://example.com"},
 				},
@@ -360,7 +360,7 @@ func TestNoUntil(t *testing.T) {
 		}, {
 			description: "detect until set",
 			opt:         NoUntil(),
-			in: Registration{
+			in: RegistrationV1{
 				Until: time.Now(),
 			},
 			expectedErr: ErrInvalidInput,
@@ -371,9 +371,14 @@ func run_tests(t *testing.T, tests []optionTest) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
-
+			var err error
 			opts := append(tc.opts, tc.opt)
-			err := tc.in.Validate(opts...)
+			switch r := tc.in.(type) {
+			case RegistrationV1:
+				err = Validate[RegistrationV1](r, opts...)
+			case RegistrationV2:
+				err = Validate[RegistrationV2](r, opts...)
+			}
 
 			assert.ErrorIs(err, tc.expectedErr)
 
