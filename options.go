@@ -4,6 +4,9 @@
 package webhook
 
 import (
+	"errors"
+	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/xmidt-org/urlegit"
@@ -18,7 +21,7 @@ type errorOption struct {
 	err error
 }
 
-func (e errorOption) Validate(Validator) error {
+func (e errorOption) Validate(any) error {
 	return error(e.err)
 }
 
@@ -35,7 +38,7 @@ func AlwaysValid() Option {
 
 type AlwaysValidOption struct{}
 
-func (a AlwaysValidOption) Validate(val Validator) error {
+func (a AlwaysValidOption) Validate(any) error {
 	return nil
 }
 
@@ -51,9 +54,18 @@ func AtLeastOneEvent() Option {
 
 type atLeastOneEventOption struct{}
 
-func (atLeastOneEventOption) Validate(val Validator) error {
-	if err := val.ValidateOneEvent(); err != nil {
-		return err
+func (atLeastOneEventOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if len(r.Events) == 0 {
+			return fmt.Errorf("%w: cannot have zero events", ErrInvalidInput)
+		}
+	case *RegistrationV2:
+		{
+			return fmt.Errorf("%w: RegistrationV2 does not have an events field to validate", ErrInvalidType)
+		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1", ErrInvalidType)
 	}
 
 	return nil
@@ -70,10 +82,26 @@ func EventRegexMustCompile() Option {
 
 type eventRegexMustCompileOption struct{}
 
-func (eventRegexMustCompileOption) Validate(val Validator) error {
-	if err := val.ValidateEventRegex(); err != nil {
-		return err
+func (eventRegexMustCompileOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		for _, e := range r.Events {
+			_, err := regexp.Compile(e)
+			if err != nil {
+				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+			}
+		}
+	case *RegistrationV2:
+		for _, m := range r.Matcher {
+			_, err := regexp.Compile(m.Regex)
+			if err != nil {
+				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+			}
+		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -89,10 +117,21 @@ func DeviceIDRegexMustCompile() Option {
 
 type deviceIDRegexMustCompileOption struct{}
 
-func (deviceIDRegexMustCompileOption) Validate(val Validator) error {
-	if err := val.ValidateDeviceId(); err != nil {
-		return err
+func (deviceIDRegexMustCompileOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		for _, e := range r.Matcher.DeviceID {
+			_, err := regexp.Compile(e)
+			if err != nil {
+				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
+			}
+		}
+	case *RegistrationV2:
+		//Matcher description is for Events. Are we not matching for DeviceId in Reg2?
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -113,10 +152,49 @@ type validateRegistrationDurationOption struct {
 	ttl time.Duration
 }
 
-func (v validateRegistrationDurationOption) Validate(val Validator) error {
-	if err := val.ValidateDuration(v.ttl); err != nil {
-		return err
+func (v validateRegistrationDurationOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if v.ttl <= 0 {
+			v.ttl = time.Duration(0)
+		}
+
+		if v.ttl != 0 && v.ttl < time.Duration(r.Duration) {
+			return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
+		}
+
+		if r.Until.IsZero() && r.Duration == 0 {
+			return fmt.Errorf("%w: either Duration or Until must be set", ErrInvalidInput)
+		}
+
+		if !r.Until.IsZero() && r.Duration != 0 {
+			return fmt.Errorf("%w: only one of Duration or Until may be set", ErrInvalidInput)
+		}
+
+		if !r.Until.IsZero() {
+			nowFunc := time.Now
+			if r.nowFunc != nil {
+				nowFunc = r.nowFunc
+			}
+
+			now := nowFunc()
+			if v.ttl != 0 && r.Until.After(now.Add(v.ttl)) {
+				return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
+			}
+
+			if r.Until.Before(now) {
+				return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
+			}
+		}
+	case *RegistrationV2:
+		now := time.Now()
+		if now.After(r.Expires) {
+			return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
+		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -134,8 +212,12 @@ type provideTimeNowFuncOption struct {
 	nowFunc func() time.Time
 }
 
-func (p provideTimeNowFuncOption) Validate(val Validator) error {
-	val.SetNowFunc(p.nowFunc)
+func (p provideTimeNowFuncOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		r.nowFunc = p.nowFunc
+	}
+
 	return nil
 }
 
@@ -156,13 +238,26 @@ type provideFailureURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideFailureURLValidatorOption) Validate(v Validator) error {
+func (p provideFailureURLValidatorOption) Validate(i any) error {
+	var failureURL string
+	//TODO: do we want to move this check to be inside each case statement?
 	if p.checker == nil {
 		return nil
 	}
 
-	if err := v.ValidateFailureURL(p.checker); err != nil {
-		return err
+	switch r := i.(type) {
+	case *RegistrationV1:
+		failureURL = r.FailureURL
+	case *RegistrationV2:
+		failureURL = r.FailureURL
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+	}
+
+	if failureURL != "" {
+		if err := p.checker.Text(failureURL); err != nil {
+			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
+		}
 	}
 	return nil
 }
@@ -184,12 +279,34 @@ type provideReceiverURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideReceiverURLValidatorOption) Validate(val Validator) error {
+func (p provideReceiverURLValidatorOption) Validate(i any) error {
 	if p.checker == nil {
 		return nil
 	}
-	if err := val.ValidateReceiverURL(p.checker); err != nil {
-		return err
+
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if r.Config.ReceiverURL != "" {
+			if err := p.checker.Text(r.Config.ReceiverURL); err != nil {
+				return fmt.Errorf("%w: receiver url is invalid", ErrInvalidInput)
+			}
+		}
+	case *RegistrationV2:
+		var errs error
+		for _, w := range r.Webhooks {
+			for _, url := range w.ReceiverURLs {
+				if url != "" {
+					if err := p.checker.Text(url); err != nil {
+						errs = errors.Join(errs, fmt.Errorf("%w: receiver url [%v] is invalid for webhook [%v]", ErrInvalidInput, url, w))
+					}
+				}
+			}
+		}
+		if errs != nil {
+			return errs
+		}
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
 
 	return nil
@@ -212,14 +329,28 @@ type provideAlternativeURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideAlternativeURLValidatorOption) Validate(val Validator) error {
+func (p provideAlternativeURLValidatorOption) Validate(i any) error {
 	if p.checker == nil {
 		return nil
 	}
 
-	if err := val.ValidateAltURL(p.checker); err != nil {
-		return err
+	switch r := i.(type) {
+	case *RegistrationV1:
+		var errs error
+		for _, url := range r.Config.AlternativeURLs {
+			if err := p.checker.Text(url); err != nil {
+				errs = errors.Join(errs, fmt.Errorf("%w: alternative url [%v] is invalid", ErrInvalidInput, url))
+			}
+		}
+		if errs != nil {
+			return errs
+		}
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not have an alternative urls field. Use ProvideReceiverURLValidator() to validate all non-failure urls", ErrInvalidOption)
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
@@ -237,37 +368,22 @@ func NoUntil() Option {
 
 type noUntilOption struct{}
 
-func (noUntilOption) Validate(val Validator) error {
-	if err := val.ValidateNoUntil(); err != nil {
-		return err
+func (noUntilOption) Validate(i any) error {
+
+	switch r := i.(type) {
+	case *RegistrationV1:
+		if !r.Until.IsZero() {
+			return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
+		}
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidOption)
+	default:
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
+
 	return nil
 }
 
 func (noUntilOption) String() string {
 	return "NoUntil()"
-}
-
-func Until(j time.Duration, m time.Duration, now func() time.Time) Option {
-	return untilOption{
-		jitter: j,
-		max:    m,
-		now:    now,
-	}
-}
-
-type untilOption struct {
-	jitter time.Duration
-	max    time.Duration
-	now    func() time.Time
-}
-
-func (u untilOption) Validate(val Validator) error {
-	if err := val.ValidateUntil(u.jitter, u.max, u.now); err != nil {
-		return err
-	}
-	return nil
-}
-func (untilOption) String() string {
-	return "Until()"
 }
