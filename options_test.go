@@ -50,6 +50,16 @@ func TestErrorOption(t *testing.T) {
 	})
 }
 
+func TestAlwaysOption(t *testing.T) {
+	run_tests(t, []optionTest{
+		{
+			description: "success",
+			opt:         AlwaysValid(),
+			in:          &RegistrationV1{},
+			str:         "alwaysValidOption",
+		},
+	})
+}
 func TestAtLeastOneEventOption(t *testing.T) {
 	run_tests(t, []optionTest{
 		{
