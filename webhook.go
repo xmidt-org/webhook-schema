@@ -70,9 +70,6 @@ type RegistrationV1 struct {
 
 	// Until describes the time this subscription expires.
 	Until time.Time `json:"until"`
-
-	// now is a function that returns the current time.  It is used for testing.
-	nowFunc func() time.Time `json:"-"`
 }
 
 type RetryHint struct {
@@ -285,9 +282,9 @@ func (v1 *RegistrationV1) ValidateDuration(ttl time.Duration) error {
 
 	if !v1.Until.IsZero() {
 		nowFunc := time.Now
-		if v1.nowFunc != nil {
-			nowFunc = v1.nowFunc
-		}
+		// if v1.nowFunc != nil {
+		// 	nowFunc = v1.nowFunc
+		// }
 
 		now := nowFunc()
 		if ttl != 0 && v1.Until.After(now.Add(ttl)) {
@@ -358,8 +355,4 @@ func (v1 *RegistrationV1) ValidateUntil(jitter time.Duration, maxTTL time.Durati
 	}
 	return nil
 
-}
-
-func (v1 *RegistrationV1) SetNowFunc(now func() time.Time) {
-	v1.nowFunc = now
 }

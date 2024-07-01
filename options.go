@@ -126,25 +126,25 @@ func (v validateRegistrationDurationOption) String() string {
 
 // ProvideTimeNowFunc is an option that allows the caller to provide a function
 // that returns the current time.  This is used for testing.
-func ProvideTimeNowFunc(nowFunc func() time.Time) Option {
-	return provideTimeNowFuncOption{nowFunc: nowFunc}
-}
+// func ProvideTimeNowFunc(nowFunc func() time.Time) Option {
+// 	return provideTimeNowFuncOption{nowFunc: nowFunc}
+// }
 
-type provideTimeNowFuncOption struct {
-	nowFunc func() time.Time
-}
+// type provideTimeNowFuncOption struct {
+// 	nowFunc func() time.Time
+// }
 
-func (p provideTimeNowFuncOption) Validate(val Validator) error {
-	val.SetNowFunc(p.nowFunc)
-	return nil
-}
+// func (p provideTimeNowFuncOption) Validate(val Validator) error {
+// 	r.nowFunc = p.nowFunc
+// 	return nil
+// }
 
-func (p provideTimeNowFuncOption) String() string {
-	if p.nowFunc == nil {
-		return "ProvideTimeNowFunc(nil)"
-	}
-	return "ProvideTimeNowFunc(func)"
-}
+// func (p provideTimeNowFuncOption) String() string {
+// 	if p.nowFunc == nil {
+// 		return "ProvideTimeNowFunc(nil)"
+// 	}
+// 	return "ProvideTimeNowFunc(func)"
+// }
 
 // ProvideFailureURLValidator is an option that allows the caller to provide a
 // URL validator that is used to validate the FailureURL.
