@@ -218,7 +218,7 @@ type Option interface {
 
 // Validate is a method that validates the registration
 // against a list of options.
-func Validate[R RegistrationV1 | RegistrationV2](r R, opts ...Option) error {
+func Validate[R *RegistrationV1 | *RegistrationV2](r R, opts ...Option) error {
 	var errs error
 	for _, opt := range opts {
 		if opt != nil {

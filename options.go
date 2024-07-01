@@ -48,12 +48,10 @@ func (atLeastOneEventOption) Validate(i any) error {
 		}
 	case *RegistrationV2:
 		{
-			if len(r.Matcher) == 0 {
-				return fmt.Errorf("%w: must have Matcher for events", ErrInvalidInput)
-			}
+			return fmt.Errorf("%w: RegistrationV2 does not have an events field to validate", ErrInvalidType)
 		}
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return fmt.Errorf("%w: Registration must be of type RegistrationV1", ErrInvalidType)
 	}
 
 	return nil
@@ -204,10 +202,6 @@ func (p provideTimeNowFuncOption) Validate(i any) error {
 	switch r := i.(type) {
 	case *RegistrationV1:
 		r.nowFunc = p.nowFunc
-	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not have nowFunc.", ErrInvalidOption)
-	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1", ErrInvalidType)
 	}
 
 	return nil
@@ -232,6 +226,7 @@ type provideFailureURLValidatorOption struct {
 
 func (p provideFailureURLValidatorOption) Validate(i any) error {
 	var failureURL string
+	//TODO: do we want to move this check to be inside each case statement?
 	if p.checker == nil {
 		return nil
 	}
@@ -337,7 +332,7 @@ func (p provideAlternativeURLValidatorOption) Validate(i any) error {
 			return errs
 		}
 	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not use alternative urls. Use ProvideReceiverURLValidator() to validate non-failure urls", ErrInvalidOption)
+		return fmt.Errorf("%w: RegistrationV2 does not have an alternative urls field. Use ProvideReceiverURLValidator() to validate all non-failure urls", ErrInvalidOption)
 	default:
 		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
 	}
