@@ -74,6 +74,7 @@ type RegistrationV1 struct {
 	// now is a function that returns the current time.  It is used for testing.
 	nowFunc func() time.Time `json:"-"`
 }
+
 type RetryHint struct {
 	//RetryEachUrl is the amount of times a URL should be retried given a failed response until the next URL in the request is tried.
 	//Default value will be set to none
