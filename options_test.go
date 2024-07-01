@@ -517,8 +517,6 @@ func TestNoUntil(t *testing.T) {
 	})
 }
 
-type EmptyStruct struct{}
-
 func run_tests(t *testing.T, tests []optionTest) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
