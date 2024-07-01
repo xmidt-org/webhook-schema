@@ -248,22 +248,14 @@ func (noUntilOption) String() string {
 	return "NoUntil()"
 }
 
-func Until(j time.Duration, m time.Duration, now func() time.Time) Option {
-	return untilOption{
-		jitter: j,
-		max:    m,
-		now:    now,
-	}
+func Until() Option {
+	return untilOption{}
 }
 
-type untilOption struct {
-	jitter time.Duration
-	max    time.Duration
-	now    func() time.Time
-}
+type untilOption struct{}
 
-func (u untilOption) Validate(val Validator) error {
-	if err := val.ValidateUntil(u.jitter, u.max, u.now); err != nil {
+func (untilOption) Validate(val Validator) error {
+	if err := val.ValidateUntil(); err != nil {
 		return err
 	}
 	return nil

@@ -10,7 +10,7 @@ type Validator interface {
 	ValidateOneEvent() error
 	ValidateEventRegex() error
 	ValidateDeviceId() error
-	ValidateUntil(time.Duration, time.Duration, func() time.Time) error
+	ValidateUntil() error
 	ValidateNoUntil() error
 	ValidateDuration(time.Duration) error
 	ValidateFailureURL(*urlegit.Checker) error
