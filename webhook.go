@@ -15,11 +15,6 @@ var (
 	ErrInvalidOption = fmt.Errorf("invalid validation option")
 )
 
-type Register interface {
-	GetId() string
-	GetUntil() time.Time
-}
-
 // Deprecated: This substructure should only be used for backwards compatibility
 // matching. Use Webhook instead.
 // DeliveryConfig is a Webhook substructure with data related to event delivery.
