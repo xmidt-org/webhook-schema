@@ -28,8 +28,9 @@ var (
 )
 
 type ValidatorConfig struct {
-	URL URLVConfig
-	TTL TTLVConfig
+	URL     URLVConfig
+	TTL     TTLVConfig
+	Options OptionsConfig
 }
 
 type URLVConfig struct {
@@ -48,7 +49,17 @@ type TTLVConfig struct {
 	Now    func() time.Time
 }
 
-// BuildURLChecker translates the configuration into url Checker to be run on the webhook.
+type OptionsConfig struct {
+	AtLeastOneEvent                bool
+	EventRegexMustCompile          bool
+	DeviceIDRegexMustCompile       bool
+	ValidateRegistrationDuration   bool
+	ProvideReceiverURLValidator    bool
+	ProvideFailureURLValidator     bool
+	ProvideAlternativeURLValidator bool
+}
+
+// BuildURLChecker translates the configuration into url Checker to be run on the registration.
 func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
 	var o []urlegit.Option
 	if config.URL.HTTPSOnly {
@@ -71,4 +82,28 @@ func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
 		return nil, err
 	}
 	return checker, nil
+}
+
+//BuildOptions translates the configuration into a list of options to be used to validate the registration
+func BuildOptions(config ValidatorConfig, checker *urlegit.Checker) []Option {
+	var opts []Option
+	if config.Options.AtLeastOneEvent {
+		opts = append(opts, AtLeastOneEvent())
+	}
+	if config.Options.EventRegexMustCompile {
+		opts = append(opts, EventRegexMustCompile())
+	}
+	if config.Options.DeviceIDRegexMustCompile {
+		opts = append(opts, DeviceIDRegexMustCompile())
+	}
+	if config.Options.ProvideReceiverURLValidator {
+		opts = append(opts, ProvideReceiverURLValidator(checker))
+	}
+	if config.Options.ProvideFailureURLValidator {
+		opts = append(opts, ProvideFailureURLValidator(checker))
+	}
+	if config.Options.ProvideAlternativeURLValidator {
+		opts = append(opts, ProvideAlternativeURLValidator(checker))
+	}
+	return opts
 }
