@@ -16,7 +16,7 @@ type optionTest struct {
 	description string
 	in          any
 	opt         Option
-	opts        []Option
+	opts        Validators
 	str         string
 	expectedErr error
 }
@@ -87,7 +87,7 @@ func TestAtLeastOneEventOption(t *testing.T) {
 		{
 			description: "default case - invalid",
 			opt:         AtLeastOneEvent(),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -149,7 +149,7 @@ func TestEventRegexMustCompile(t *testing.T) {
 		{
 			description: "default case - invalid",
 			opt:         EventRegexMustCompile(),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -187,7 +187,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		{
 			description: "default case - invalid",
 			opt:         DeviceIDRegexMustCompile(),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -310,7 +310,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 		{
 			description: "default case - invalid",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -374,7 +374,7 @@ func TestProvideFailureURLValidator(t *testing.T) {
 		}, {
 			description: "default case - invalid",
 			opt:         ProvideFailureURLValidator(checker),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -434,7 +434,7 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 		}, {
 			description: "default case - invalid",
 			opt:         ProvideReceiverURLValidator(checker),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -489,11 +489,11 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 			description: "failure - RegistrationV2",
 			opt:         ProvideAlternativeURLValidator(checker),
 			in:          &RegistrationV2{},
-			expectedErr: ErrInvalidOption,
+			expectedErr: ErrInvalidType,
 		}, {
 			description: "default case - invalid",
 			opt:         ProvideAlternativeURLValidator(checker),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -517,12 +517,12 @@ func TestNoUntil(t *testing.T) {
 			description: "failure - V2",
 			opt:         NoUntil(),
 			in:          &RegistrationV2{},
-			expectedErr: ErrInvalidOption,
+			expectedErr: ErrInvalidType,
 		},
 		{
 			description: "default case - invalid",
 			opt:         NoUntil(),
-			expectedErr: ErrInvalidType,
+			expectedErr: ErrUknownType,
 		},
 	})
 }
@@ -535,14 +535,11 @@ func run_tests(t *testing.T, tests []optionTest) {
 			opts := append(tc.opts, tc.opt)
 			switch r := tc.in.(type) {
 			case *RegistrationV1:
-				err = Validate(r, opts...)
+				err = opts.Validate(r)
 			case *RegistrationV2:
-				err = Validate(r, opts...)
+				err = opts.Validate(r)
 			default:
-				for _, o := range opts {
-					err = o.Validate(nil)
-					assert.ErrorIs(err, tc.expectedErr)
-				}
+				err = opts.Validate(nil)
 			}
 			assert.ErrorIs(err, tc.expectedErr)
 
