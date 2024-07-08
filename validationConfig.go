@@ -6,27 +6,6 @@ import (
 	"github.com/xmidt-org/urlegit"
 )
 
-var (
-	SpecialUseIPs = []string{
-		"0.0.0.0/8",          //local ipv4
-		"fe80::/10",          //local ipv6
-		"255.255.255.255/32", //broadcast to neighbors
-		"2001::/32",          //ipv6 TEREDO prefix
-		"2001:5::/32",        //EID space for lisp
-		"2002::/16",          //ipv6 6to4
-		"fc00::/7",           //ipv6 unique local
-		"192.0.0.0/24",       //ipv4 IANA
-		"2001:0000::/23",     //ipv6 IANA
-		"224.0.0.1/32",       //ipv4 multicast
-	}
-	SpecialUseHosts = []string{
-		".example.",
-		".invalid.",
-		".test.",
-		"localhost",
-	}
-)
-
 type ValidatorConfig struct {
 	URL     URLVConfig
 	TTL     TTLVConfig
@@ -60,6 +39,28 @@ type OptionsConfig struct {
 }
 
 // BuildURLChecker translates the configuration into url Checker to be run on the registration.
+var (
+	SpecialUseIPs = []string{
+		"0.0.0.0/8",          //local ipv4
+		"fe80::/10",          //local ipv6
+		"255.255.255.255/32", //broadcast to neighbors
+		"2001::/32",          //ipv6 TEREDO prefix
+		"2001:5::/32",        //EID space for lisp
+		"2002::/16",          //ipv6 6to4
+		"fc00::/7",           //ipv6 unique local
+		"192.0.0.0/24",       //ipv4 IANA
+		"2001:0000::/23",     //ipv6 IANA
+		"224.0.0.1/32",       //ipv4 multicast
+	}
+	SpecialUseHosts = []string{
+		".example.",
+		".invalid.",
+		".test.",
+		"localhost",
+	}
+)
+
+// BuildURLChecker translates the configuration into url Checker to be run on the webhook.
 func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
 	var o []urlegit.Option
 	if config.URL.HTTPSOnly {
@@ -84,6 +85,7 @@ func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
 	return checker, nil
 }
 
+<<<<<<< HEAD
 //BuildOptions translates the configuration into a list of options to be used to validate the registration
 func BuildOptions(config ValidatorConfig, checker *urlegit.Checker) []Option {
 	var opts []Option
@@ -106,4 +108,25 @@ func BuildOptions(config ValidatorConfig, checker *urlegit.Checker) []Option {
 		opts = append(opts, ProvideAlternativeURLValidator(checker))
 	}
 	return opts
+=======
+// BuildValidators translates the configuration into a list of validators to be run on the
+// webhook.
+func BuildValidators(config ValidatorConfig) ([]Option, error) {
+	var opts []Option
+
+	checker, err := BuildURLChecker(config)
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts,
+		AtLeastOneEvent(),
+		EventRegexMustCompile(),
+		DeviceIDRegexMustCompile(),
+		ValidateRegistrationDuration(config.TTL.Max),
+		ProvideReceiverURLValidator(checker),
+		ProvideFailureURLValidator(checker),
+		ProvideAlternativeURLValidator(checker),
+	)
+	return opts, nil
+>>>>>>> validation-v3
 }

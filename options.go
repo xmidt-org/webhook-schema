@@ -4,9 +4,7 @@
 package webhook
 
 import (
-	"errors"
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/xmidt-org/urlegit"
@@ -57,18 +55,12 @@ type atLeastOneEventOption struct{}
 func (atLeastOneEventOption) Validate(i any) error {
 	switch r := i.(type) {
 	case *RegistrationV1:
-		if len(r.Events) == 0 {
-			return fmt.Errorf("%w: cannot have zero events", ErrInvalidInput)
-		}
+		return r.ValidateOneEvent()
 	case *RegistrationV2:
-		{
-			return fmt.Errorf("%w: RegistrationV2 does not have an events field to validate", ErrInvalidType)
-		}
+		return fmt.Errorf("%w: RegistrationV2 does not have an events field to validate", ErrInvalidType)
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1", ErrInvalidType)
+		return ErrUknownType
 	}
-
-	return nil
 }
 
 func (atLeastOneEventOption) String() string {
@@ -85,24 +77,12 @@ type eventRegexMustCompileOption struct{}
 func (eventRegexMustCompileOption) Validate(i any) error {
 	switch r := i.(type) {
 	case *RegistrationV1:
-		for _, e := range r.Events {
-			_, err := regexp.Compile(e)
-			if err != nil {
-				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
-			}
-		}
+		return r.ValidateEventRegex()
 	case *RegistrationV2:
-		for _, m := range r.Matcher {
-			_, err := regexp.Compile(m.Regex)
-			if err != nil {
-				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
-			}
-		}
+		return r.ValidateEventRegex()
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return ErrUknownType
 	}
-
-	return nil
 }
 
 func (eventRegexMustCompileOption) String() string {
@@ -120,16 +100,11 @@ type deviceIDRegexMustCompileOption struct{}
 func (deviceIDRegexMustCompileOption) Validate(i any) error {
 	switch r := i.(type) {
 	case *RegistrationV1:
-		for _, e := range r.Matcher.DeviceID {
-			_, err := regexp.Compile(e)
-			if err != nil {
-				return fmt.Errorf("%w: unable to compile matching", ErrInvalidInput)
-			}
-		}
+		return r.ValidateDeviceId()
 	case *RegistrationV2:
 		//Matcher description is for Events. Are we not matching for DeviceId in Reg2?
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return ErrUknownType
 	}
 
 	return nil
@@ -155,47 +130,12 @@ type validateRegistrationDurationOption struct {
 func (v validateRegistrationDurationOption) Validate(i any) error {
 	switch r := i.(type) {
 	case *RegistrationV1:
-		if v.ttl <= 0 {
-			v.ttl = time.Duration(0)
-		}
-
-		if v.ttl != 0 && v.ttl < time.Duration(r.Duration) {
-			return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
-		}
-
-		if r.Until.IsZero() && r.Duration == 0 {
-			return fmt.Errorf("%w: either Duration or Until must be set", ErrInvalidInput)
-		}
-
-		if !r.Until.IsZero() && r.Duration != 0 {
-			return fmt.Errorf("%w: only one of Duration or Until may be set", ErrInvalidInput)
-		}
-
-		if !r.Until.IsZero() {
-			nowFunc := time.Now
-			if r.nowFunc != nil {
-				nowFunc = r.nowFunc
-			}
-
-			now := nowFunc()
-			if v.ttl != 0 && r.Until.After(now.Add(v.ttl)) {
-				return fmt.Errorf("%w: the registration is for too long", ErrInvalidInput)
-			}
-
-			if r.Until.Before(now) {
-				return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
-			}
-		}
+		return r.ValidateDuration(v.ttl)
 	case *RegistrationV2:
-		now := time.Now()
-		if now.After(r.Expires) {
-			return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
-		}
+		return r.ValidateDuration()
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return ErrUknownType
 	}
-
-	return nil
 }
 
 func (v validateRegistrationDurationOption) String() string {
@@ -215,7 +155,7 @@ type provideTimeNowFuncOption struct {
 func (p provideTimeNowFuncOption) Validate(i any) error {
 	switch r := i.(type) {
 	case *RegistrationV1:
-		r.nowFunc = p.nowFunc
+		r.SetNowFunc(p.nowFunc)
 	}
 
 	return nil
@@ -251,7 +191,7 @@ func (p provideFailureURLValidatorOption) Validate(i any) error {
 	case *RegistrationV2:
 		failureURL = r.FailureURL
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return ErrUknownType
 	}
 
 	if failureURL != "" {
@@ -286,30 +226,12 @@ func (p provideReceiverURLValidatorOption) Validate(i any) error {
 
 	switch r := i.(type) {
 	case *RegistrationV1:
-		if r.Config.ReceiverURL != "" {
-			if err := p.checker.Text(r.Config.ReceiverURL); err != nil {
-				return fmt.Errorf("%w: receiver url is invalid", ErrInvalidInput)
-			}
-		}
+		return r.ValidateReceiverURL(p.checker)
 	case *RegistrationV2:
-		var errs error
-		for _, w := range r.Webhooks {
-			for _, url := range w.ReceiverURLs {
-				if url != "" {
-					if err := p.checker.Text(url); err != nil {
-						errs = errors.Join(errs, fmt.Errorf("%w: receiver url [%v] is invalid for webhook [%v]", ErrInvalidInput, url, w))
-					}
-				}
-			}
-		}
-		if errs != nil {
-			return errs
-		}
+		return r.ValidateReceiverURL(p.checker)
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return ErrUknownType
 	}
-
-	return nil
 }
 
 func (p provideReceiverURLValidatorOption) String() string {
@@ -336,22 +258,12 @@ func (p provideAlternativeURLValidatorOption) Validate(i any) error {
 
 	switch r := i.(type) {
 	case *RegistrationV1:
-		var errs error
-		for _, url := range r.Config.AlternativeURLs {
-			if err := p.checker.Text(url); err != nil {
-				errs = errors.Join(errs, fmt.Errorf("%w: alternative url [%v] is invalid", ErrInvalidInput, url))
-			}
-		}
-		if errs != nil {
-			return errs
-		}
+		return r.ValidateAltURL(p.checker)
 	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not have an alternative urls field. Use ProvideReceiverURLValidator() to validate all non-failure urls", ErrInvalidOption)
+		return fmt.Errorf("%w: RegistrationV2 does not have an alternative urls field. Use ProvideReceiverURLValidator() to validate all non-failure urls", ErrInvalidType)
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return ErrUknownType
 	}
-
-	return nil
 }
 
 func (p provideAlternativeURLValidatorOption) String() string {
@@ -369,19 +281,15 @@ func NoUntil() Option {
 type noUntilOption struct{}
 
 func (noUntilOption) Validate(i any) error {
-
 	switch r := i.(type) {
 	case *RegistrationV1:
-		if !r.Until.IsZero() {
-			return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
-		}
+		return r.ValidateNoUntil()
 	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidOption)
+		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidType)
 	default:
-		return fmt.Errorf("%w: Registration must be of type RegistrationV1 or RegistrationV2", ErrInvalidType)
+		return ErrUknownType
 	}
 
-	return nil
 }
 
 func (noUntilOption) String() string {
