@@ -85,7 +85,6 @@ func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
 	return checker, nil
 }
 
-<<<<<<< HEAD
 //BuildOptions translates the configuration into a list of options to be used to validate the registration
 func BuildOptions(config ValidatorConfig, checker *urlegit.Checker) []Option {
 	var opts []Option
@@ -108,25 +107,4 @@ func BuildOptions(config ValidatorConfig, checker *urlegit.Checker) []Option {
 		opts = append(opts, ProvideAlternativeURLValidator(checker))
 	}
 	return opts
-=======
-// BuildValidators translates the configuration into a list of validators to be run on the
-// webhook.
-func BuildValidators(config ValidatorConfig) ([]Option, error) {
-	var opts []Option
-
-	checker, err := BuildURLChecker(config)
-	if err != nil {
-		return nil, err
-	}
-	opts = append(opts,
-		AtLeastOneEvent(),
-		EventRegexMustCompile(),
-		DeviceIDRegexMustCompile(),
-		ValidateRegistrationDuration(config.TTL.Max),
-		ProvideReceiverURLValidator(checker),
-		ProvideFailureURLValidator(checker),
-		ProvideAlternativeURLValidator(checker),
-	)
-	return opts, nil
->>>>>>> validation-v3
 }
