@@ -281,7 +281,6 @@ func NoUntil() Option {
 type noUntilOption struct{}
 
 func (noUntilOption) Validate(i any) error {
-
 	switch r := i.(type) {
 	case *RegistrationV1:
 		return r.ValidateNoUntil()
