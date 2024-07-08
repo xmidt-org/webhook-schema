@@ -6,27 +6,6 @@ import (
 	"github.com/xmidt-org/urlegit"
 )
 
-var (
-	SpecialUseIPs = []string{
-		"0.0.0.0/8",          //local ipv4
-		"fe80::/10",          //local ipv6
-		"255.255.255.255/32", //broadcast to neighbors
-		"2001::/32",          //ipv6 TEREDO prefix
-		"2001:5::/32",        //EID space for lisp
-		"2002::/16",          //ipv6 6to4
-		"fc00::/7",           //ipv6 unique local
-		"192.0.0.0/24",       //ipv4 IANA
-		"2001:0000::/23",     //ipv6 IANA
-		"224.0.0.1/32",       //ipv4 multicast
-	}
-	SpecialUseHosts = []string{
-		".example.",
-		".invalid.",
-		".test.",
-		"localhost",
-	}
-)
-
 type ValidatorConfig struct {
 	URL URLVConfig
 	TTL TTLVConfig
@@ -47,6 +26,27 @@ type TTLVConfig struct {
 	Jitter time.Duration
 	Now    func() time.Time
 }
+
+var (
+	SpecialUseIPs = []string{
+		"0.0.0.0/8",          //local ipv4
+		"fe80::/10",          //local ipv6
+		"255.255.255.255/32", //broadcast to neighbors
+		"2001::/32",          //ipv6 TEREDO prefix
+		"2001:5::/32",        //EID space for lisp
+		"2002::/16",          //ipv6 6to4
+		"fc00::/7",           //ipv6 unique local
+		"192.0.0.0/24",       //ipv4 IANA
+		"2001:0000::/23",     //ipv6 IANA
+		"224.0.0.1/32",       //ipv4 multicast
+	}
+	SpecialUseHosts = []string{
+		".example.",
+		".invalid.",
+		".test.",
+		"localhost",
+	}
+)
 
 // BuildURLChecker translates the configuration into url Checker to be run on the webhook.
 func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
