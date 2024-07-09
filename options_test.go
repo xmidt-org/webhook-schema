@@ -85,7 +85,7 @@ func TestAtLeastOneEventOption(t *testing.T) {
 			expectedErr: ErrInvalidType,
 		},
 		{
-			description: "default case - invalid",
+			description: "default case - unknown",
 			opt:         AtLeastOneEvent(),
 			expectedErr: ErrUknownType,
 		},
@@ -147,7 +147,7 @@ func TestEventRegexMustCompile(t *testing.T) {
 			expectedErr: ErrInvalidInput,
 		},
 		{
-			description: "default case - invalid",
+			description: "default case - unknown",
 			opt:         EventRegexMustCompile(),
 			expectedErr: ErrUknownType,
 		},
@@ -157,7 +157,7 @@ func TestEventRegexMustCompile(t *testing.T) {
 func TestDeviceIDRegexMustCompile(t *testing.T) {
 	run_tests(t, []optionTest{
 		{
-			description: "the regex compiles",
+			description: "the regex compiles - v1",
 			opt:         DeviceIDRegexMustCompile(),
 			in: &RegistrationV1{
 				Matcher: MetadataMatcherConfig{
@@ -166,7 +166,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 			},
 			str: "DeviceIDRegexMustCompile()",
 		}, {
-			description: "multiple device ids",
+			description: "multiple device ids - v1",
 			opt:         DeviceIDRegexMustCompile(),
 			in: &RegistrationV1{
 				Matcher: MetadataMatcherConfig{
@@ -175,7 +175,7 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 			},
 			str: "DeviceIDRegexMustCompile()",
 		}, {
-			description: "failure",
+			description: "failure - v1",
 			opt:         DeviceIDRegexMustCompile(),
 			in: &RegistrationV1{
 				Matcher: MetadataMatcherConfig{
@@ -185,7 +185,13 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 			expectedErr: ErrInvalidInput,
 		},
 		{
-			description: "default case - invalid",
+			description: "invalid type - v2",
+			opt: DeviceIDRegexMustCompile(),
+			in: &RegistrationV2{},
+			expectedErr: ErrInvalidType,
+		},
+		{
+			description: "default case - unknown",
 			opt:         DeviceIDRegexMustCompile(),
 			expectedErr: ErrUknownType,
 		},
@@ -308,7 +314,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 			expectedErr: ErrInvalidInput,
 		},
 		{
-			description: "default case - invalid",
+			description: "default case - unknown",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
 			expectedErr: ErrUknownType,
 		},
@@ -372,7 +378,7 @@ func TestProvideFailureURLValidator(t *testing.T) {
 			},
 			expectedErr: ErrInvalidInput,
 		}, {
-			description: "default case - invalid",
+			description: "default case - unknown",
 			opt:         ProvideFailureURLValidator(checker),
 			expectedErr: ErrUknownType,
 		},
@@ -432,7 +438,7 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 			},
 			expectedErr: ErrInvalidInput,
 		}, {
-			description: "default case - invalid",
+			description: "default case - unknown",
 			opt:         ProvideReceiverURLValidator(checker),
 			expectedErr: ErrUknownType,
 		},
@@ -491,7 +497,7 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 			in:          &RegistrationV2{},
 			expectedErr: ErrInvalidType,
 		}, {
-			description: "default case - invalid",
+			description: "default case - unknown",
 			opt:         ProvideAlternativeURLValidator(checker),
 			expectedErr: ErrUknownType,
 		},
@@ -520,7 +526,7 @@ func TestNoUntil(t *testing.T) {
 			expectedErr: ErrInvalidType,
 		},
 		{
-			description: "default case - invalid",
+			description: "default case - unknown",
 			opt:         NoUntil(),
 			expectedErr: ErrUknownType,
 		},

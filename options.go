@@ -102,11 +102,10 @@ func (deviceIDRegexMustCompileOption) Validate(i any) error {
 	case *RegistrationV1:
 		return r.ValidateDeviceId()
 	case *RegistrationV2:
-		//Matcher description is for Events. Are we not matching for DeviceId in Reg2?
+		return fmt.Errorf("%w: RegistrationV2 does not use DeviceID directly, use `FieldRegex` instead", ErrInvalidType)
 	default:
 		return ErrUknownType
 	}
-	return nil
 }
 
 func (deviceIDRegexMustCompileOption) String() string {
