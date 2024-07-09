@@ -61,7 +61,7 @@ var (
 )
 
 // BuildURLChecker translates the configuration into url Checker to be run on the webhook.
-func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
+func (config *ValidatorConfig) GetValidator() (*urlegit.Checker, error) {
 	var o []urlegit.Option
 	if config.URL.HTTPSOnly {
 		o = append(o, urlegit.OnlyAllowSchemes("https"))
@@ -78,14 +78,13 @@ func BuildURLChecker(config ValidatorConfig) (*urlegit.Checker, error) {
 	if !config.URL.AllowSpecialUseIPs {
 		o = append(o, urlegit.ForbidSubnets(SpecialUseIPs))
 	}
-	checker, err := urlegit.New(o...)
-	if err != nil {
-		return nil, err
+	if len(config.URL.InvalidSubnets) > 0 {
+		o = append(o, urlegit.ForbidSubnets(config.URL.InvalidSubnets))
 	}
-	return checker, nil
+	return urlegit.New(o...)
 }
 
-//BuildOptions translates the configuration into a list of options to be used to validate the registration
+// BuildOptions translates the configuration into a list of options to be used to validate the registration
 func BuildOptions(config ValidatorConfig, checker *urlegit.Checker) []Option {
 	var opts []Option
 	if config.Options.AtLeastOneEvent {
