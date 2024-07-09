@@ -106,7 +106,6 @@ func (deviceIDRegexMustCompileOption) Validate(i any) error {
 	default:
 		return ErrUknownType
 	}
-
 	return nil
 }
 
@@ -289,7 +288,6 @@ func (noUntilOption) Validate(i any) error {
 	default:
 		return ErrUknownType
 	}
-
 }
 
 func (noUntilOption) String() string {
