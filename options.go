@@ -4,6 +4,7 @@
 package webhook
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/xmidt-org/urlegit"
@@ -18,7 +19,7 @@ type errorOption struct {
 	err error
 }
 
-func (e errorOption) Validate(Validator) error {
+func (e errorOption) Validate(any) error {
 	return error(e.err)
 }
 
@@ -35,7 +36,7 @@ func AlwaysValid() Option {
 
 type AlwaysValidOption struct{}
 
-func (a AlwaysValidOption) Validate(val Validator) error {
+func (a AlwaysValidOption) Validate(any) error {
 	return nil
 }
 
@@ -51,12 +52,15 @@ func AtLeastOneEvent() Option {
 
 type atLeastOneEventOption struct{}
 
-func (atLeastOneEventOption) Validate(val Validator) error {
-	if err := val.ValidateOneEvent(); err != nil {
-		return err
+func (atLeastOneEventOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.ValidateOneEvent()
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not have an events field to validate", ErrInvalidType)
+	default:
+		return ErrUknownType
 	}
-
-	return nil
 }
 
 func (atLeastOneEventOption) String() string {
@@ -70,11 +74,15 @@ func EventRegexMustCompile() Option {
 
 type eventRegexMustCompileOption struct{}
 
-func (eventRegexMustCompileOption) Validate(val Validator) error {
-	if err := val.ValidateEventRegex(); err != nil {
-		return err
+func (eventRegexMustCompileOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.ValidateEventRegex()
+	case *RegistrationV2:
+		return r.ValidateEventRegex()
+	default:
+		return ErrUknownType
 	}
-	return nil
 }
 
 func (eventRegexMustCompileOption) String() string {
@@ -89,11 +97,15 @@ func DeviceIDRegexMustCompile() Option {
 
 type deviceIDRegexMustCompileOption struct{}
 
-func (deviceIDRegexMustCompileOption) Validate(val Validator) error {
-	if err := val.ValidateDeviceId(); err != nil {
-		return err
+func (deviceIDRegexMustCompileOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.ValidateDeviceId()
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not use DeviceID directly, use `FieldRegex` instead", ErrInvalidType)
+	default:
+		return ErrUknownType
 	}
-	return nil
 }
 
 func (deviceIDRegexMustCompileOption) String() string {
@@ -113,11 +125,15 @@ type validateRegistrationDurationOption struct {
 	ttl time.Duration
 }
 
-func (v validateRegistrationDurationOption) Validate(val Validator) error {
-	if err := val.ValidateDuration(v.ttl); err != nil {
-		return err
+func (v validateRegistrationDurationOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.ValidateDuration(v.ttl)
+	case *RegistrationV2:
+		return r.ValidateDuration()
+	default:
+		return ErrUknownType
 	}
-	return nil
 }
 
 func (v validateRegistrationDurationOption) String() string {
@@ -134,8 +150,12 @@ type provideTimeNowFuncOption struct {
 	nowFunc func() time.Time
 }
 
-func (p provideTimeNowFuncOption) Validate(val Validator) error {
-	val.SetNowFunc(p.nowFunc)
+func (p provideTimeNowFuncOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		r.SetNowFunc(p.nowFunc)
+	}
+
 	return nil
 }
 
@@ -156,13 +176,26 @@ type provideFailureURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideFailureURLValidatorOption) Validate(v Validator) error {
+func (p provideFailureURLValidatorOption) Validate(i any) error {
+	var failureURL string
+	//TODO: do we want to move this check to be inside each case statement?
 	if p.checker == nil {
 		return nil
 	}
 
-	if err := v.ValidateFailureURL(p.checker); err != nil {
-		return err
+	switch r := i.(type) {
+	case *RegistrationV1:
+		failureURL = r.FailureURL
+	case *RegistrationV2:
+		failureURL = r.FailureURL
+	default:
+		return ErrUknownType
+	}
+
+	if failureURL != "" {
+		if err := p.checker.Text(failureURL); err != nil {
+			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
+		}
 	}
 	return nil
 }
@@ -184,15 +217,19 @@ type provideReceiverURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideReceiverURLValidatorOption) Validate(val Validator) error {
+func (p provideReceiverURLValidatorOption) Validate(i any) error {
 	if p.checker == nil {
 		return nil
 	}
-	if err := val.ValidateReceiverURL(p.checker); err != nil {
-		return err
-	}
 
-	return nil
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.ValidateReceiverURL(p.checker)
+	case *RegistrationV2:
+		return r.ValidateReceiverURL(p.checker)
+	default:
+		return ErrUknownType
+	}
 }
 
 func (p provideReceiverURLValidatorOption) String() string {
@@ -212,15 +249,19 @@ type provideAlternativeURLValidatorOption struct {
 	checker *urlegit.Checker
 }
 
-func (p provideAlternativeURLValidatorOption) Validate(val Validator) error {
+func (p provideAlternativeURLValidatorOption) Validate(i any) error {
 	if p.checker == nil {
 		return nil
 	}
 
-	if err := val.ValidateAltURL(p.checker); err != nil {
-		return err
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.ValidateAltURL(p.checker)
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not have an alternative urls field. Use ProvideReceiverURLValidator() to validate all non-failure urls", ErrInvalidType)
+	default:
+		return ErrUknownType
 	}
-	return nil
 }
 
 func (p provideAlternativeURLValidatorOption) String() string {
@@ -237,37 +278,17 @@ func NoUntil() Option {
 
 type noUntilOption struct{}
 
-func (noUntilOption) Validate(val Validator) error {
-	if err := val.ValidateNoUntil(); err != nil {
-		return err
+func (noUntilOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.ValidateNoUntil()
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidType)
+	default:
+		return ErrUknownType
 	}
-	return nil
 }
 
 func (noUntilOption) String() string {
 	return "NoUntil()"
-}
-
-func Until(j time.Duration, m time.Duration, now func() time.Time) Option {
-	return untilOption{
-		jitter: j,
-		max:    m,
-		now:    now,
-	}
-}
-
-type untilOption struct {
-	jitter time.Duration
-	max    time.Duration
-	now    func() time.Time
-}
-
-func (u untilOption) Validate(val Validator) error {
-	if err := val.ValidateUntil(u.jitter, u.max, u.now); err != nil {
-		return err
-	}
-	return nil
-}
-func (untilOption) String() string {
-	return "Until()"
 }

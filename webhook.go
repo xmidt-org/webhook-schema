@@ -14,12 +14,9 @@ import (
 
 var (
 	ErrInvalidInput = fmt.Errorf("invalid input")
+	ErrInvalidType  = fmt.Errorf("invalid type")
+	ErrUknownType   = fmt.Errorf("unknown type")
 )
-
-type Register interface {
-	GetId() string
-	GetUntil() time.Time
-}
 
 // Deprecated: This substructure should only be used for backwards compatibility
 // matching. Use Webhook instead.
@@ -209,7 +206,7 @@ type RegistrationV2 struct {
 	FailureURL string `json:"failure_url"`
 
 	// Matcher is the list of regular expressions to match incoming events against to.
-	// Note. Any failures due to a bad regex feild or regex expression will result in a silent failure.
+	// Note. Any failures due to a bad regex field or regex expression will result in a silent failure.
 	Matcher []FieldRegex `json:"matcher,omitempty"`
 
 	// Expires describes the time this subscription expires.
@@ -219,16 +216,17 @@ type RegistrationV2 struct {
 
 type Option interface {
 	fmt.Stringer
-	Validate(Validator) error
+	Validate(any) error
 }
+type Validators []Option
 
-// Validate is a method on Registration that validates the registration
+// Validate is a method that validates the registration
 // against a list of options.
-func Validate(v Validator, opts []Option) error {
+func (vs Validators) Validate(r any) error {
 	var errs error
-	for _, opt := range opts {
+	for _, opt := range vs {
 		if opt != nil {
-			if err := opt.Validate(v); err != nil {
+			if err := opt.Validate(r); err != nil {
 				errs = errors.Join(errs, err)
 			}
 		}
@@ -302,15 +300,6 @@ func (v1 *RegistrationV1) ValidateDuration(ttl time.Duration) error {
 	return errs
 }
 
-func (v1 *RegistrationV1) ValidateFailureURL(c *urlegit.Checker) error {
-	if v1.FailureURL != "" {
-		if err := c.Text(v1.FailureURL); err != nil {
-			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
-		}
-	}
-	return nil
-}
-
 func (v1 *RegistrationV1) ValidateReceiverURL(c *urlegit.Checker) error {
 	if v1.Config.ReceiverURL != "" {
 		if err := c.Text(v1.Config.ReceiverURL); err != nil {
@@ -362,4 +351,37 @@ func (v1 *RegistrationV1) ValidateUntil(jitter time.Duration, maxTTL time.Durati
 
 func (v1 *RegistrationV1) SetNowFunc(now func() time.Time) {
 	v1.nowFunc = now
+}
+
+func (v2 *RegistrationV2) ValidateEventRegex() error {
+	var errs error
+	for _, m := range v2.Matcher {
+		_, err := regexp.Compile(m.Regex)
+		if err != nil {
+			errs = errors.Join(fmt.Errorf("%w: %v", ErrInvalidInput, err))
+		}
+	}
+	return errs
+}
+
+func (v2 *RegistrationV2) ValidateDuration() error {
+	now := time.Now()
+	if now.After(v2.Expires) {
+		return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
+	}
+	return nil
+}
+
+func (v2 *RegistrationV2) ValidateReceiverURL(checker *urlegit.Checker) error {
+	var errs error
+	for _, w := range v2.Webhooks {
+		for _, url := range w.ReceiverURLs {
+			if url != "" {
+				if err := checker.Text(url); err != nil {
+					errs = errors.Join(errs, fmt.Errorf("%w: receiver url [%v] is invalid for webhook [%v]", ErrInvalidInput, url, w))
+				}
+			}
+		}
+	}
+	return errs
 }
