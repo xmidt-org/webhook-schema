@@ -113,37 +113,19 @@ func TestEventRegexMustCompile(t *testing.T) {
 		{
 			description: "the regex compiles - V2",
 			opt:         EventRegexMustCompile(),
-			in: &RegistrationV2{Matcher: []FieldRegex{
-				{
-					Field: "canonical_name",
-					Regex: "webpa",
-				},
-			}},
-			str: "EventRegexMustCompile()",
+			in:          &RegistrationV2{Matcher: []FieldRegex{{Field: "canonical_name", Regex: "webpa"}}},
+			str:         "EventRegexMustCompile()",
 		},
 		{
 			description: "multiple matchers - V2",
 			opt:         EventRegexMustCompile(),
-			in: &RegistrationV2{Matcher: []FieldRegex{
-				{
-					Field: "canonical_name",
-					Regex: "webpa",
-				},
-				{
-					Field: "address",
-					Regex: "www.example.com",
-				},
-			}},
-			str: "EventRegexMustCompile()",
+			in:          &RegistrationV2{Matcher: []FieldRegex{{Field: "canonical_name", Regex: "webpa"}, {Field: "address", Regex: "www.example.com"}}},
+			str:         "EventRegexMustCompile()",
 		},
 		{
 			description: "failure - V2",
 			opt:         EventRegexMustCompile(),
-			in: &RegistrationV2{Matcher: []FieldRegex{
-				{
-					Regex: "(",
-				},
-			}},
+			in:          &RegistrationV2{Matcher: []FieldRegex{{Regex: "("}}},
 			expectedErr: ErrInvalidInput,
 		},
 		{
@@ -159,35 +141,23 @@ func TestDeviceIDRegexMustCompile(t *testing.T) {
 		{
 			description: "the regex compiles - v1",
 			opt:         DeviceIDRegexMustCompile(),
-			in: &RegistrationV1{
-				Matcher: MetadataMatcherConfig{
-					DeviceID: []string{"device.*"},
-				},
-			},
-			str: "DeviceIDRegexMustCompile()",
+			in:          &RegistrationV1{Matcher: MetadataMatcherConfig{DeviceID: []string{"device.*"}}},
+			str:         "DeviceIDRegexMustCompile()",
 		}, {
 			description: "multiple device ids - v1",
 			opt:         DeviceIDRegexMustCompile(),
-			in: &RegistrationV1{
-				Matcher: MetadataMatcherConfig{
-					DeviceID: []string{"device.*", "magic-thing"},
-				},
-			},
-			str: "DeviceIDRegexMustCompile()",
+			in:          &RegistrationV1{Matcher: MetadataMatcherConfig{DeviceID: []string{"device.*", "magic-thing"}}},
+			str:         "DeviceIDRegexMustCompile()",
 		}, {
 			description: "failure - v1",
 			opt:         DeviceIDRegexMustCompile(),
-			in: &RegistrationV1{
-				Matcher: MetadataMatcherConfig{
-					DeviceID: []string{"("},
-				},
-			},
+			in:          &RegistrationV1{Matcher: MetadataMatcherConfig{DeviceID: []string{"("}}},
 			expectedErr: ErrInvalidInput,
 		},
 		{
 			description: "invalid type - v2",
-			opt: DeviceIDRegexMustCompile(),
-			in: &RegistrationV2{},
+			opt:         DeviceIDRegexMustCompile(),
+			in:          &RegistrationV2{},
 			expectedErr: ErrInvalidType,
 		},
 		{
@@ -206,99 +176,58 @@ func TestValidateRegistrationDuration(t *testing.T) {
 		{
 			description: "success with time in bounds - V1",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: &RegistrationV1{
-				Duration: CustomDuration(4 * time.Minute),
-			},
-			str: "ValidateRegistrationDuration(5m0s)",
+			in:          &RegistrationV1{Duration: CustomDuration(4 * time.Minute)},
+			str:         "ValidateRegistrationDuration(5m0s)",
 		}, {
 			description: "success with time in bounds, exactly - V1",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: &RegistrationV1{
-				Duration: CustomDuration(5 * time.Minute),
-			},
+			in:          &RegistrationV1{Duration: CustomDuration(5 * time.Minute)},
 		}, {
 			description: "failure with time out of bounds - V1",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: &RegistrationV1{
-				Duration: CustomDuration(6 * time.Minute),
-			},
+			in:          &RegistrationV1{Duration: CustomDuration(6 * time.Minute)},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "success with max ttl ignored - V1",
 			opt:         ValidateRegistrationDuration(-5 * time.Minute),
-			in: &RegistrationV1{
-				Duration: CustomDuration(1 * time.Minute),
-			},
+			in:          &RegistrationV1{Duration: CustomDuration(1 * time.Minute)},
 		}, {
 			description: "success with max ttl ignored, 0 duration - V1",
 			opt:         ValidateRegistrationDuration(0),
-			in: &RegistrationV1{
-				Duration: CustomDuration(1 * time.Minute),
-			},
+			in:          &RegistrationV1{Duration: CustomDuration(1 * time.Minute)},
 		}, {
 			description: "success with until in bounds - V1",
-			opts: []Option{
-				ProvideTimeNowFunc(now),
-				ValidateRegistrationDuration(5 * time.Minute),
-			},
-			in: &RegistrationV1{
-				Until: time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC),
-			},
+			opts:        []Option{ProvideTimeNowFunc(now), ValidateRegistrationDuration(5 * time.Minute)},
+			in:          &RegistrationV1{Until: time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC)},
 		}, {
 			description: "failure due to until being before now - V1",
-			opts: []Option{
-				ValidateRegistrationDuration(5 * time.Minute),
-				ProvideTimeNowFunc(now),
-			},
+			opts:        []Option{ValidateRegistrationDuration(5 * time.Minute), ProvideTimeNowFunc(now)},
 			in: &RegistrationV1{
 				Until: time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC),
 			},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "success with until exactly in bounds - V1",
-			opts: []Option{
-				ProvideTimeNowFunc(now),
-				ValidateRegistrationDuration(5 * time.Minute),
-			},
-			in: &RegistrationV1{
-				Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC),
-			},
+			opts:        []Option{ProvideTimeNowFunc(now), ValidateRegistrationDuration(5 * time.Minute)},
+			in:          &RegistrationV1{Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC)},
 		}, {
 			description: "failure due to the options being out of order - V1",
-			opts: []Option{
-				ValidateRegistrationDuration(5 * time.Minute),
-				ProvideTimeNowFunc(now),
-			},
-			in: &RegistrationV1{
-				Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC),
-			},
+			opts:        []Option{ValidateRegistrationDuration(5 * time.Minute), ProvideTimeNowFunc(now)},
+			in:          &RegistrationV1{Until: time.Date(2021, 1, 1, 0, 5, 0, 0, time.UTC)},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "failure with until out of bounds - V1",
-			opts: []Option{
-				ProvideTimeNowFunc(now),
-				ValidateRegistrationDuration(5 * time.Minute),
-			},
-			in: &RegistrationV1{
-				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
-			},
+			opts:        []Option{ProvideTimeNowFunc(now), ValidateRegistrationDuration(5 * time.Minute)},
+			in:          &RegistrationV1{Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC)},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "success with until just needing to be present - V1",
-			opts: []Option{
-				ProvideTimeNowFunc(now),
-				ValidateRegistrationDuration(0),
-			},
-			in: &RegistrationV1{
-				Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC),
-			},
+			opts:        []Option{ProvideTimeNowFunc(now), ValidateRegistrationDuration(0)},
+			in:          &RegistrationV1{Until: time.Date(2021, 1, 1, 0, 6, 0, 0, time.UTC)},
 		}, {
 			description: "failure, both expirations set - V1",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
-			in: &RegistrationV1{
-				Duration: CustomDuration(1 * time.Minute),
-				Until:    time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC),
-			},
+			in:          &RegistrationV1{Duration: CustomDuration(1 * time.Minute), Until: time.Date(2021, 1, 1, 0, 4, 0, 0, time.UTC)},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "failure, no expiration set - V1",
@@ -307,9 +236,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "failure, exipred - V2",
-			in: &RegistrationV2{
-				Expires: now(),
-			},
+			in:          &RegistrationV2{Expires: now()},
 			opt:         ValidateRegistrationDuration(0),
 			expectedErr: ErrInvalidInput,
 		},
@@ -352,30 +279,22 @@ func TestProvideFailureURLValidator(t *testing.T) {
 		}, {
 			description: "success, with checker - V1",
 			opt:         ProvideFailureURLValidator(checker),
-			in: &RegistrationV1{
-				FailureURL: "https://example.com",
-			},
-			str: "ProvideFailureURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
+			in:          &RegistrationV1{FailureURL: "https://example.com"},
+			str:         "ProvideFailureURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker - V1",
 			opt:         ProvideFailureURLValidator(checker),
-			in: &RegistrationV1{
-				FailureURL: "http://example.com",
-			},
+			in:          &RegistrationV1{FailureURL: "http://example.com"},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "success, with checker - V2",
 			opt:         ProvideFailureURLValidator(checker),
-			in: &RegistrationV2{
-				FailureURL: "https://example.com",
-			},
-			str: "ProvideFailureURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
+			in:          &RegistrationV2{FailureURL: "https://example.com"},
+			str:         "ProvideFailureURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker - V2",
 			opt:         ProvideFailureURLValidator(checker),
-			in: &RegistrationV2{
-				FailureURL: "http://example.com",
-			},
+			in:          &RegistrationV2{FailureURL: "http://example.com"},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "default case - unknown",
@@ -398,44 +317,22 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 		}, {
 			description: "success, with checker - V1",
 			opt:         ProvideReceiverURLValidator(checker),
-			in: &RegistrationV1{
-				Config: DeliveryConfig{
-					ReceiverURL: "https://example.com",
-				},
-			},
-			str: "ProvideReceiverURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
+			in:          &RegistrationV1{Config: DeliveryConfig{ReceiverURL: "https://example.com"}},
+			str:         "ProvideReceiverURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker - V1",
 			opt:         ProvideReceiverURLValidator(checker),
-			in: &RegistrationV1{
-				Config: DeliveryConfig{
-					ReceiverURL: "http://example.com",
-				},
-			},
+			in:          &RegistrationV1{Config: DeliveryConfig{ReceiverURL: "http://example.com"}},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "success, with checker - V2",
 			opt:         ProvideReceiverURLValidator(checker),
-			in: &RegistrationV2{
-				Webhooks: []Webhook{
-					{
-						ReceiverURLs: []string{"https://example.com",
-							"https://example2.com"},
-					},
-				},
-			},
-			str: "ProvideReceiverURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
+			in:          &RegistrationV2{Webhooks: []Webhook{{ReceiverURLs: []string{"https://example.com", "https://example2.com"}}}},
+			str:         "ProvideReceiverURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker - V2",
 			opt:         ProvideReceiverURLValidator(checker),
-			in: &RegistrationV2{
-				Webhooks: []Webhook{
-					{
-						ReceiverURLs: []string{"https://example.com",
-							"http://example2.com"},
-					},
-				},
-			},
+			in:          &RegistrationV2{Webhooks: []Webhook{{ReceiverURLs: []string{"https://example.com", "http://example2.com"}}}},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "default case - unknown",
@@ -458,38 +355,22 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 		}, {
 			description: "success, with checker",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: &RegistrationV1{
-				Config: DeliveryConfig{
-					AlternativeURLs: []string{"https://example.com"},
-				},
-			},
-			str: "ProvideAlternativeURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
+			in:          &RegistrationV1{Config: DeliveryConfig{AlternativeURLs: []string{"https://example.com"}}},
+			str:         "ProvideAlternativeURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "success, with checker and multiple urls",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: &RegistrationV1{
-				Config: DeliveryConfig{
-					AlternativeURLs: []string{"https://example.com", "https://example.org"},
-				},
-			},
-			str: "ProvideAlternativeURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
+			in:          &RegistrationV1{Config: DeliveryConfig{AlternativeURLs: []string{"https://example.com", "https://example.org"}}},
+			str:         "ProvideAlternativeURLValidator(urlegit.Checker{ OnlyAllowSchemes('https') })",
 		}, {
 			description: "failure, with checker",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: &RegistrationV1{
-				Config: DeliveryConfig{
-					AlternativeURLs: []string{"http://example.com"},
-				},
-			},
+			in:          &RegistrationV1{Config: DeliveryConfig{AlternativeURLs: []string{"http://example.com"}}},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "failure, with checker with multiple urls",
 			opt:         ProvideAlternativeURLValidator(checker),
-			in: &RegistrationV1{
-				Config: DeliveryConfig{
-					AlternativeURLs: []string{"https://example.com", "http://example.com"},
-				},
-			},
+			in:          &RegistrationV1{Config: DeliveryConfig{AlternativeURLs: []string{"https://example.com", "http://example.com"}}},
 			expectedErr: ErrInvalidInput,
 		}, {
 			description: "failure - RegistrationV2",
