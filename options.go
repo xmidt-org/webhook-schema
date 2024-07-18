@@ -292,3 +292,32 @@ func (noUntilOption) Validate(i any) error {
 func (noUntilOption) String() string {
 	return "NoUntil()"
 }
+
+func Until(now func() time.Time, jitter, max time.Duration) Option {
+	return untilOption{
+		now:    now,
+		jitter: jitter,
+		max:    max,
+	}
+}
+
+type untilOption struct {
+	now    func() time.Time
+	jitter time.Duration
+	max    time.Duration
+}
+
+func (u untilOption) Validate(i any) error {
+	switch r := i.(type) {
+	case *RegistrationV1:
+		return r.CheckUntil(u.now, u.jitter, u.max)
+	case *RegistrationV2:
+		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidType)
+	default:
+		return ErrUknownType
+	}
+}
+
+func (u untilOption) String() string {
+	return fmt.Sprintf("untilOption(%v, %v, %v)", u.jitter.String(), u.max.String(), u.now().String())
+}

@@ -13,9 +13,12 @@ import (
 )
 
 var (
-	ErrInvalidInput = fmt.Errorf("invalid input")
-	ErrInvalidType  = fmt.Errorf("invalid type")
-	ErrUknownType   = fmt.Errorf("unknown type")
+	ErrInvalidInput  = fmt.Errorf("invalid input")
+	ErrInvalidType   = fmt.Errorf("invalid type")
+	ErrUknownType    = fmt.Errorf("unknown type")
+	errInvalidTTL    = errors.New("TTL must be non-negative")
+	errInvalidJitter = errors.New("jitter must be non-negative")
+	errInvalidUntil  = errors.New("until value of webhook is out of bounds")
 )
 
 // Deprecated: This substructure should only be used for backwards compatibility
@@ -298,6 +301,30 @@ func (v1 *RegistrationV1) ValidateDuration(ttl time.Duration) error {
 	}
 
 	return errs
+}
+
+func (v1 *RegistrationV1) CheckUntil(now func() time.Time, jitter, maxTTL time.Duration) error {
+	if now == nil {
+		now = time.Now
+	}
+
+	if maxTTL < 0 {
+		return errInvalidTTL
+	} else if jitter < 0 {
+		return errInvalidJitter
+	}
+
+	if v1.Until.IsZero() {
+		return nil
+	}
+	limit := (now().Add(maxTTL)).Add(jitter)
+	proposed := (v1.Until)
+	if proposed.After(limit) {
+		return fmt.Errorf("%w: %v after %v",
+			errInvalidUntil, proposed.String(), limit.String())
+	}
+	return nil
+
 }
 
 func (v1 *RegistrationV1) ValidateReceiverURL(c *urlegit.Checker) error {

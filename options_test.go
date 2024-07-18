@@ -12,6 +12,10 @@ import (
 	"github.com/xmidt-org/urlegit"
 )
 
+var mockNow = func() time.Time {
+	return time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
+}
+
 type optionTest struct {
 	description string
 	in          any
@@ -413,6 +417,18 @@ func TestNoUntil(t *testing.T) {
 		},
 	})
 }
+
+// func TestUntilOption(t *testing.T) {
+// 	run_tests(t, []optionTest{
+// 		{
+// 			description: "success, until",
+// 			in: &RegistrationV1{
+// 				Until: time.Now(),
+// 			},
+// 			opt: Until(mockNow, time.Duration(1*time.Minute), time.Duration(5*time.Minute)),
+// 		},
+// 	})
+// }
 
 func run_tests(t *testing.T, tests []optionTest) {
 	for _, tc := range tests {
