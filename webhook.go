@@ -134,7 +134,11 @@ type Webhook struct {
 
 // Kafka is a substructure with data related to event delivery.
 type Kafka struct {
-	// Accept is content type value to set WRP messages to (unless already specified in the WRP).
+	// Accept is the encoding type of outgoing events. The following encoding types are supported, otherwise
+	// a 406 response code is returned: application/octet-stream, application/json, application/jsonl, application/msgpack.
+	// Note: An `Accept` of application/octet-stream or application/json will result in a single response for batch sizes of 0 or 1
+	// and batch sizes greater than 1 will result in a multipart response. An `Accept` of application/jsonl or application/msgpack
+	// will always result in a single response with a list of batched events for any batch size.
 	Accept string `json:"accept"`
 
 	// BootstrapServers is a list of kafka broker addresses.
