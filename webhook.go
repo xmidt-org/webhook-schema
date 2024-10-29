@@ -75,6 +75,7 @@ type RegistrationV1 struct {
 	nowFunc func() time.Time `json:"-"`
 }
 
+// RetryHint is the substructure for configuration related to retrying requests.
 type RetryHint struct {
 	//RetryEachUrl is the amount of times a URL should be retried given a failed response until the next URL in the request is tried.
 	//Default value will be set to none
@@ -82,6 +83,16 @@ type RetryHint struct {
 
 	//MaxRetry is the total amount times a request will be retried.
 	MaxRetry int `json:"max_retry"`
+}
+
+// DNSSrvRecord is the substructure for configuration related to load balancing.
+type DNSSrvRecord struct {
+	// FQDNs is a list of FQDNs pointing to dns srv records
+	FQDNs []string `json:"fqdns"`
+
+	// LoadBalancingScheme is the scheme to use for load balancing. Either the
+	// srv record attribute `weight` or `priortiy` can be used.
+	LoadBalancingScheme string `json:"load_balancing_scheme"`
 }
 
 // Webhook is a substructure with data related to event delivery.
@@ -118,14 +129,7 @@ type Webhook struct {
 
 	// DNSSrvRecord is the substructure for configuration related to load balancing.
 	// Note: either `ReceiverURLs` or `DNSSrvRecord` must be used but not both.
-	DNSSrvRecord struct {
-		// FQDNs is a list of FQDNs pointing to dns srv records
-		FQDNs []string `json:"fqdns"`
-
-		// LoadBalancingScheme is the scheme to use for load balancing. Either the
-		// srv record attribute `weight` or `priortiy` can be used.
-		LoadBalancingScheme string `json:"load_balancing_scheme"`
-	} `json:"dns_srv_record"`
+	DNSSrvRecord DNSSrvRecord `json:"dns_srv_record"`
 
 	//RetryHint is the substructure for configuration related to retrying requests.
 	// (Optional, if omited then retries will be based on default values defined by server)
@@ -134,7 +138,11 @@ type Webhook struct {
 
 // Kafka is a substructure with data related to event delivery.
 type Kafka struct {
-	// Accept is content type value to set WRP messages to (unless already specified in the WRP).
+	// Accept is the encoding type of outgoing events. The following encoding types are supported, otherwise
+	// a 406 response code is returned: application/octet-stream, application/json, application/jsonl, application/msgpack.
+	// Note: An `Accept` of application/octet-stream or application/json will result in a single response for batch sizes of 0 or 1
+	// and batch sizes greater than 1 will result in a multipart response. An `Accept` of application/jsonl or application/msgpack
+	// will always result in a single response with a list of batched events for any batch size.
 	Accept string `json:"accept"`
 
 	// BootstrapServers is a list of kafka broker addresses.
