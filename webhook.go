@@ -99,9 +99,14 @@ type DNSSrvRecord struct {
 type Webhook struct {
 	// Accept is the encoding type of outgoing events. The following encoding types are supported, otherwise
 	// a 406 response code is returned: application/octet-stream, application/json, application/jsonl, application/msgpack.
-	// Note: An `Accept` of application/octet-stream or application/json will result in a single response for batch sizes of 0 or 1
-	// and batch sizes greater than 1 will result in a multipart response. An `Accept` of application/jsonl or application/msgpack
-	// will always result in a single response with a list of batched events for any batch size.
+	/*
+		Note:
+			An `Accept` of application/octet-stream supports single message return with payload of WRP
+			An `Accept` of application/json supports single message return with json form of WRP
+			An `Accept` of application/jsonl supports single or multi records with each line being independent json encoding of a WRP
+			An `Accept` of application/msgpack supports single or multi records with a single record being of msgpack and multiple records being
+			returned as an array of binary data with the binary data being the msgpacked WRP for each message
+	*/
 	Accept string `json:"accept"`
 
 	// AcceptEncoding is the content type of outgoing events. The following content types are supported, otherwise
