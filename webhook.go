@@ -101,11 +101,11 @@ type Webhook struct {
 	// a 406 response code is returned: application/octet-stream, application/json, application/jsonl, application/msgpack.
 	/*
 		Note:
-			An `Accept` of application/octet-stream supports single message return with payload of WRP
-			An `Accept` of application/json supports single message return with json form of WRP
-			An `Accept` of application/jsonl supports single or multi records with each line being independent json encoding of a WRP
-			An `Accept` of application/msgpack supports single or multi records with a single record being of msgpack and multiple records being
-			returned as an array of binary data with the binary data being the msgpacked WRP for each message
+			application/wrp+json - one json encoded wrp message
+			application/wrp+msgpack - one msgpack encoded wrp message
+			application/wrp+octet-stream - one message with the wrp payload in the http payload
+			application/wrp+jsonl - multiple jsonl encoded wrp messages
+			application/wrp+msgpackl - multiple msgpackl encoded wrp messages
 	*/
 	Accept string `json:"accept"`
 
