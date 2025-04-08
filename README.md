@@ -1,6 +1,6 @@
 # webhook-schema
 
-A simple library for housing the webhook-schema and validation code. 
+A simple library for housing the wrpEventStream-schema and validation code. 
 
 [![Build Status](https://github.com/xmidt-org/webhook-schema/actions/workflows/ci.yml/badge.svg)](https://github.com/xmidt-org/webhook-schema/actions/workflows/ci.yml)
 [![codecov.io](http://codecov.io/github/xmidt-org/webhook-schema/coverage.svg?branch=main)](http://codecov.io/github/xmidt-org/webhook-schema?branch=main)

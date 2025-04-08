@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package webhook
+package stream
 
 import (
 	"fmt"
@@ -54,10 +54,10 @@ type atLeastOneEventOption struct{}
 
 func (atLeastOneEventOption) Validate(i any) error {
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.ValidateOneEvent()
-	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not have an events field to validate", ErrInvalidType)
+	case *SchemaV2:
+		return fmt.Errorf("%w: SchemaV2 does not have an events field to validate", ErrInvalidType)
 	default:
 		return ErrUknownType
 	}
@@ -76,9 +76,9 @@ type eventRegexMustCompileOption struct{}
 
 func (eventRegexMustCompileOption) Validate(i any) error {
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.ValidateEventRegex()
-	case *RegistrationV2:
+	case *SchemaV2:
 		return r.ValidateEventRegex()
 	default:
 		return ErrUknownType
@@ -99,10 +99,10 @@ type deviceIDRegexMustCompileOption struct{}
 
 func (deviceIDRegexMustCompileOption) Validate(i any) error {
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.ValidateDeviceId()
-	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not use DeviceID directly, use `FieldRegex` instead", ErrInvalidType)
+	case *SchemaV2:
+		return fmt.Errorf("%w: SchemaV2 does not use DeviceID directly, use `FieldRegex` instead", ErrInvalidType)
 	default:
 		return ErrUknownType
 	}
@@ -112,32 +112,32 @@ func (deviceIDRegexMustCompileOption) String() string {
 	return "DeviceIDRegexMustCompile()"
 }
 
-// ValidateRegistrationDuration ensures that the requsted registration duration
+// ValidateDuration ensures that the requsted registration duration
 // of a webhook is valid.  This option checks the values set in either the
 // Duration or Until fields of the webhook. If the ttl is less than or equal to
 // zero, this option will not boundary check the registration duration, but will
 // still ensure that the Duration or Until fields are set.
-func ValidateRegistrationDuration(ttl time.Duration) Option {
-	return validateRegistrationDurationOption{ttl: ttl}
+func ValidateDuration(ttl time.Duration) Option {
+	return validateDurationOption{ttl: ttl}
 }
 
-type validateRegistrationDurationOption struct {
+type validateDurationOption struct {
 	ttl time.Duration
 }
 
-func (v validateRegistrationDurationOption) Validate(i any) error {
+func (v validateDurationOption) Validate(i any) error {
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.ValidateDuration(v.ttl)
-	case *RegistrationV2:
+	case *SchemaV2:
 		return r.ValidateDuration()
 	default:
 		return ErrUknownType
 	}
 }
 
-func (v validateRegistrationDurationOption) String() string {
-	return "ValidateRegistrationDuration(" + v.ttl.String() + ")"
+func (v validateDurationOption) String() string {
+	return "ValidateDuration(" + v.ttl.String() + ")"
 }
 
 // ProvideTimeNowFunc is an option that allows the caller to provide a function
@@ -152,7 +152,7 @@ type provideTimeNowFuncOption struct {
 
 func (p provideTimeNowFuncOption) Validate(i any) error {
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		r.SetNowFunc(p.nowFunc)
 	}
 
@@ -184,9 +184,9 @@ func (p provideFailureURLValidatorOption) Validate(i any) error {
 	}
 
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		failureURL = r.FailureURL
-	case *RegistrationV2:
+	case *SchemaV2:
 		failureURL = r.FailureURL
 	default:
 		return ErrUknownType
@@ -223,9 +223,9 @@ func (p provideReceiverURLValidatorOption) Validate(i any) error {
 	}
 
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.ValidateReceiverURL(p.checker)
-	case *RegistrationV2:
+	case *SchemaV2:
 		return r.ValidateReceiverURL(p.checker)
 	default:
 		return ErrUknownType
@@ -255,10 +255,10 @@ func (p provideAlternativeURLValidatorOption) Validate(i any) error {
 	}
 
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.ValidateAltURL(p.checker)
-	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not have an alternative urls field. Use ProvideReceiverURLValidator() to validate all non-failure urls", ErrInvalidType)
+	case *SchemaV2:
+		return fmt.Errorf("%w: SchemaV2 does not have an alternative urls field. Use ProvideReceiverURLValidator() to validate all non-failure urls", ErrInvalidType)
 	default:
 		return ErrUknownType
 	}
@@ -280,10 +280,10 @@ type noUntilOption struct{}
 
 func (noUntilOption) Validate(i any) error {
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.ValidateNoUntil()
-	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidType)
+	case *SchemaV2:
+		return fmt.Errorf("%w: SchemaV2 does not use an Until field", ErrInvalidType)
 	default:
 		return ErrUknownType
 	}
@@ -309,10 +309,10 @@ type untilOption struct {
 
 func (u untilOption) Validate(i any) error {
 	switch r := i.(type) {
-	case *RegistrationV1:
+	case *SchemaV1:
 		return r.CheckUntil(u.now, u.jitter, u.max)
-	case *RegistrationV2:
-		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidType)
+	case *SchemaV2:
+		return fmt.Errorf("%w: SchemaV2 does not use an Until field", ErrInvalidType)
 	default:
 		return ErrUknownType
 	}

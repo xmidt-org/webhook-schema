@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2022 Comcast Cable Communications Management, LLC
 // SPDX-License-Identifier: Apache-2.0
 
-package webhook
+package stream
 
 import (
 	"errors"
@@ -46,9 +46,9 @@ type MetadataMatcherConfig struct {
 }
 
 // Deprecated: This structure should only be used for backwards compatibility
-// matching. Use RegistrationV2 instead.
-// RegistrationV1 is a special struct for unmarshaling a webhook as part of a webhook registration request.
-type RegistrationV1 struct {
+// matching. Use SchemaV2 instead.
+// SchemaV1 is the schema for only webhook stream registration and used to unmarshal registration requests.
+type SchemaV1 struct {
 	// Address is the subscription request origin HTTP Address.
 	Address string `json:"registered_from_address"`
 
@@ -188,8 +188,9 @@ type ContactInfo struct {
 	Email string `json:"email"`
 }
 
-// RegistrationV2 is a special struct for unmarshaling sink information as part of a sink registration request.
-type RegistrationV2 struct {
+// SchemaV2 is the schema for wrpEventStream registration and used to unmarshal registration requests.
+// SchemaV2 is sink agnostic.
+type SchemaV2 struct {
 	// ContactInfo contains contact information used to reach the owner of the registration.
 	// (Optional).
 	ContactInfo ContactInfo `json:"contact_info,omitempty"`
@@ -250,14 +251,14 @@ func (vs Validators) Validate(r any) error {
 	return errs
 }
 
-func (v1 *RegistrationV1) ValidateOneEvent() error {
+func (v1 *SchemaV1) ValidateOneEvent() error {
 	if len(v1.Events) == 0 {
 		return fmt.Errorf("%w: cannot have zero events", ErrInvalidInput)
 	}
 	return nil
 }
 
-func (v1 *RegistrationV1) ValidateEventRegex() error {
+func (v1 *SchemaV1) ValidateEventRegex() error {
 	var errs error
 	for _, e := range v1.Events {
 		_, err := regexp.Compile(e)
@@ -268,7 +269,7 @@ func (v1 *RegistrationV1) ValidateEventRegex() error {
 	return errs
 }
 
-func (v1 *RegistrationV1) ValidateDeviceId() error {
+func (v1 *SchemaV1) ValidateDeviceId() error {
 	var errs error
 	for _, e := range v1.Matcher.DeviceID {
 		_, err := regexp.Compile(e)
@@ -279,7 +280,7 @@ func (v1 *RegistrationV1) ValidateDeviceId() error {
 	return errs
 }
 
-func (v1 *RegistrationV1) ValidateDuration(ttl time.Duration) error {
+func (v1 *SchemaV1) ValidateDuration(ttl time.Duration) error {
 	var errs error
 	if ttl <= 0 {
 		ttl = time.Duration(0)
@@ -316,7 +317,7 @@ func (v1 *RegistrationV1) ValidateDuration(ttl time.Duration) error {
 	return errs
 }
 
-func (v1 *RegistrationV1) CheckUntil(now func() time.Time, jitter, maxTTL time.Duration) error {
+func (v1 *SchemaV1) CheckUntil(now func() time.Time, jitter, maxTTL time.Duration) error {
 	if now == nil {
 		now = time.Now
 	}
@@ -340,7 +341,7 @@ func (v1 *RegistrationV1) CheckUntil(now func() time.Time, jitter, maxTTL time.D
 
 }
 
-func (v1 *RegistrationV1) ValidateReceiverURL(c *urlegit.Checker) error {
+func (v1 *SchemaV1) ValidateReceiverURL(c *urlegit.Checker) error {
 	if v1.Config.ReceiverURL != "" {
 		if err := c.Text(v1.Config.ReceiverURL); err != nil {
 			return fmt.Errorf("%w: failure url is invalid", ErrInvalidInput)
@@ -349,7 +350,7 @@ func (v1 *RegistrationV1) ValidateReceiverURL(c *urlegit.Checker) error {
 	return nil
 }
 
-func (v1 *RegistrationV1) ValidateAltURL(c *urlegit.Checker) error {
+func (v1 *SchemaV1) ValidateAltURL(c *urlegit.Checker) error {
 	var errs error
 	for _, url := range v1.Config.AlternativeURLs {
 		if err := c.Text(url); err != nil {
@@ -359,14 +360,14 @@ func (v1 *RegistrationV1) ValidateAltURL(c *urlegit.Checker) error {
 	return errs
 }
 
-func (v1 *RegistrationV1) ValidateNoUntil() error {
+func (v1 *SchemaV1) ValidateNoUntil() error {
 	if !v1.Until.IsZero() {
 		return fmt.Errorf("%w: Until is not allowed", ErrInvalidInput)
 	}
 	return nil
 }
 
-func (v1 *RegistrationV1) ValidateUntil(jitter time.Duration, maxTTL time.Duration, now func() time.Time) error {
+func (v1 *SchemaV1) ValidateUntil(jitter time.Duration, maxTTL time.Duration, now func() time.Time) error {
 	if now == nil {
 		now = time.Now
 	}
@@ -389,11 +390,11 @@ func (v1 *RegistrationV1) ValidateUntil(jitter time.Duration, maxTTL time.Durati
 
 }
 
-func (v1 *RegistrationV1) SetNowFunc(now func() time.Time) {
+func (v1 *SchemaV1) SetNowFunc(now func() time.Time) {
 	v1.nowFunc = now
 }
 
-func (v2 *RegistrationV2) ValidateEventRegex() error {
+func (v2 *SchemaV2) ValidateEventRegex() error {
 	var errs error
 	for _, m := range v2.Matcher {
 		_, err := regexp.Compile(m.Regex)
@@ -404,7 +405,7 @@ func (v2 *RegistrationV2) ValidateEventRegex() error {
 	return errs
 }
 
-func (v2 *RegistrationV2) ValidateDuration() error {
+func (v2 *SchemaV2) ValidateDuration() error {
 	now := time.Now()
 	if now.After(v2.Expires) {
 		return fmt.Errorf("%w: the registration has already expired", ErrInvalidInput)
@@ -412,7 +413,7 @@ func (v2 *RegistrationV2) ValidateDuration() error {
 	return nil
 }
 
-func (v2 *RegistrationV2) ValidateReceiverURL(checker *urlegit.Checker) error {
+func (v2 *SchemaV2) ValidateReceiverURL(checker *urlegit.Checker) error {
 	var errs error
 	for _, w := range v2.Webhooks {
 		for _, url := range w.ReceiverURLs {
