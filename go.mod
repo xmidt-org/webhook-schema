@@ -1,10 +1,11 @@
 module github.com/xmidt-org/webhook-schema
 
-go 1.20
+go 1.24
 
 require (
 	github.com/stretchr/testify v1.10.0
 	github.com/xmidt-org/urlegit v0.1.28
+	go.uber.org/multierr v1.11.0
 )
 
 require (
