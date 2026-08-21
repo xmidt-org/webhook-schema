@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/stretchr/testify v1.12.1
-	github.com/xmidt-org/urlegit v0.1.29
+	github.com/xmidt-org/urlegit v0.1.30
 )
 
 require go.yaml.in/yaml/v3 v3.0.5 // indirect
