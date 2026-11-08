@@ -26,7 +26,7 @@ type optionTest struct {
 }
 
 func TestErrorOption(t *testing.T) {
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success",
 			in:          &RegistrationV1{},
@@ -55,7 +55,7 @@ func TestErrorOption(t *testing.T) {
 }
 
 func TestAlwaysOption(t *testing.T) {
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success",
 			opt:         AlwaysValid(),
@@ -65,7 +65,7 @@ func TestAlwaysOption(t *testing.T) {
 	})
 }
 func TestAtLeastOneEventOption(t *testing.T) {
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "there is an event - V1",
 			opt:         AtLeastOneEvent(),
@@ -97,7 +97,7 @@ func TestAtLeastOneEventOption(t *testing.T) {
 }
 
 func TestEventRegexMustCompile(t *testing.T) {
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "the regex compiles - V1",
 			opt:         EventRegexMustCompile(),
@@ -141,7 +141,7 @@ func TestEventRegexMustCompile(t *testing.T) {
 }
 
 func TestDeviceIDRegexMustCompile(t *testing.T) {
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "the regex compiles - v1",
 			opt:         DeviceIDRegexMustCompile(),
@@ -176,7 +176,7 @@ func TestValidateRegistrationDuration(t *testing.T) {
 	now := func() time.Time {
 		return time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success with time in bounds - V1",
 			opt:         ValidateRegistrationDuration(5 * time.Minute),
@@ -257,7 +257,7 @@ func TestProvideTimeNowFunc(t *testing.T) {
 		return time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
 	}
 
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success",
 			opt:         ProvideTimeNowFunc(now),
@@ -275,7 +275,7 @@ func TestProvideFailureURLValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, checker)
 
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success, no checker",
 			opt:         ProvideFailureURLValidator(nil),
@@ -313,7 +313,7 @@ func TestProvideReceiverURLValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, checker)
 
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success, no checker",
 			opt:         ProvideReceiverURLValidator(nil),
@@ -351,7 +351,7 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, checker)
 
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success, no checker",
 			opt:         ProvideAlternativeURLValidator(nil),
@@ -390,7 +390,7 @@ func TestProvideAlternativeURLValidator(t *testing.T) {
 }
 
 func TestNoUntil(t *testing.T) {
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success, no until set",
 			in:          &RegistrationV1{},
@@ -419,23 +419,23 @@ func TestNoUntil(t *testing.T) {
 }
 
 func TestUntilOption(t *testing.T) {
-	run_tests(t, []optionTest{
+	runTests(t, []optionTest{
 		{
 			description: "success, until",
 			in: &RegistrationV1{
 				Until: mockNow(),
 			},
-			opt: Until(time.Now, time.Duration(1*time.Minute), time.Duration(5*time.Minute)),
+			opt: Until(time.Now, time.Minute, 5*time.Minute),
 		},
 	})
 }
 
-func run_tests(t *testing.T, tests []optionTest) {
+func runTests(t *testing.T, tests []optionTest) {
 	for _, tc := range tests {
 		t.Run(tc.description, func(t *testing.T) {
 			assert := assert.New(t)
 			var err error
-			opts := append(tc.opts, tc.opt)
+			opts := append(append(Validators{}, tc.opts...), tc.opt)
 			switch r := tc.in.(type) {
 			case *RegistrationV1:
 				err = opts.Validate(r)
@@ -444,7 +444,11 @@ func run_tests(t *testing.T, tests []optionTest) {
 			default:
 				err = opts.Validate(nil)
 			}
-			assert.ErrorIs(err, tc.expectedErr)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+			}
 
 			if tc.str != "" && tc.opt != nil {
 				assert.Equal(tc.str, tc.opt.String())

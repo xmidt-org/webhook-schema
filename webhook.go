@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	ErrInvalidInput  = fmt.Errorf("invalid input")
-	ErrInvalidType   = fmt.Errorf("invalid type")
-	ErrUknownType    = fmt.Errorf("unknown type")
+	ErrInvalidInput  = errors.New("invalid input")
+	ErrInvalidType   = errors.New("invalid type")
+	ErrUknownType    = errors.New("unknown type")
 	errInvalidTTL    = errors.New("TTL must be non-negative")
 	errInvalidJitter = errors.New("jitter must be non-negative")
 	errInvalidUntil  = errors.New("until value of webhook is out of bounds")
@@ -77,11 +77,11 @@ type RegistrationV1 struct {
 
 // RetryHint is the substructure for configuration related to retrying requests.
 type RetryHint struct {
-	//RetryEachUrl is the amount of times a URL should be retried given a failed response until the next URL in the request is tried.
-	//Default value will be set to none
-	RetryEachUrl int `json:"retry_each_url"`
+	// RetryEachUrl is the amount of times a URL should be retried given a failed response until the next URL in the request is tried.
+	// Default value will be set to none
+	RetryEachUrl int `json:"retry_each_url"` //nolint:revive // exported name retained for API compatibility
 
-	//MaxRetry is the total amount times a request will be retried.
+	// MaxRetry is the total amount times a request will be retried.
 	MaxRetry int `json:"max_retry"`
 }
 
@@ -136,8 +136,8 @@ type Webhook struct {
 	// Note: either `ReceiverURLs` or `DNSSrvRecord` must be used but not both.
 	DNSSrvRecord DNSSrvRecord `json:"dns_srv_record"`
 
-	//RetryHint is the substructure for configuration related to retrying requests.
-	// (Optional, if omited then retries will be based on default values defined by server)
+	// RetryHint is the substructure for configuration related to retrying requests.
+	// (Optional, if omitted then retries will be based on default values defined by server)
 	RetryHint RetryHint `json:"retry_hint"`
 }
 
@@ -158,8 +158,8 @@ type Kafka struct {
 	// this substructures also includes auth related secrets, noted `MaxOpenRequests` will be excluded since it's already exposed
 	KafkaProducer struct{} `json:"kafka_producer"`
 
-	//RetryHint is the substructure for configuration related to retrying requests.
-	// (Optional, if omited then retries will be based on default values defined by server)
+	// RetryHint is the substructure for configuration related to retrying requests.
+	// (Optional, if omitted then retries will be based on default values defined by server)
 	RetryHint RetryHint `json:"retry_hint"`
 }
 
@@ -213,7 +213,7 @@ type RegistrationV2 struct {
 	Hash FieldRegex `json:"hash"`
 
 	// BatchHint is the substructure for configuration related to event batching.
-	// (Optional, if omited then batches of singal events will be sent)
+	// (Optional, if omitted then batches of signal events will be sent)
 	// Default value will disable batch. All zeros will also disable batch.
 	BatchHint BatchHint `json:"batch_hints"`
 
@@ -268,6 +268,7 @@ func (v1 *RegistrationV1) ValidateEventRegex() error {
 	return errs
 }
 
+//nolint:revive // exported name retained for API compatibility
 func (v1 *RegistrationV1) ValidateDeviceId() error {
 	var errs error
 	for _, e := range v1.Matcher.DeviceID {
@@ -337,7 +338,6 @@ func (v1 *RegistrationV1) CheckUntil(now func() time.Time, jitter, maxTTL time.D
 			errInvalidUntil, proposed.String(), limit.String())
 	}
 	return nil
-
 }
 
 func (v1 *RegistrationV1) ValidateReceiverURL(c *urlegit.Checker) error {
@@ -366,7 +366,7 @@ func (v1 *RegistrationV1) ValidateNoUntil() error {
 	return nil
 }
 
-func (v1 *RegistrationV1) ValidateUntil(jitter time.Duration, maxTTL time.Duration, now func() time.Time) error {
+func (v1 *RegistrationV1) ValidateUntil(jitter, maxTTL time.Duration, now func() time.Time) error {
 	if now == nil {
 		now = time.Now
 	}
@@ -386,7 +386,6 @@ func (v1 *RegistrationV1) ValidateUntil(jitter time.Duration, maxTTL time.Durati
 			ErrInvalidInput, proposed.String(), limit.String())
 	}
 	return nil
-
 }
 
 func (v1 *RegistrationV1) SetNowFunc(now func() time.Time) {
@@ -398,7 +397,7 @@ func (v2 *RegistrationV2) ValidateEventRegex() error {
 	for _, m := range v2.Matcher {
 		_, err := regexp.Compile(m.Regex)
 		if err != nil {
-			errs = errors.Join(fmt.Errorf("%w: %v", ErrInvalidInput, err))
+			errs = errors.Join(fmt.Errorf("%w: %w", ErrInvalidInput, err))
 		}
 	}
 	return errs

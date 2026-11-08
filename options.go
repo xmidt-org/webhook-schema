@@ -20,7 +20,7 @@ type errorOption struct {
 }
 
 func (e errorOption) Validate(any) error {
-	return error(e.err)
+	return e.err
 }
 
 func (e errorOption) String() string {
@@ -151,8 +151,7 @@ type provideTimeNowFuncOption struct {
 }
 
 func (p provideTimeNowFuncOption) Validate(i any) error {
-	switch r := i.(type) {
-	case *RegistrationV1:
+	if r, ok := i.(*RegistrationV1); ok {
 		r.SetNowFunc(p.nowFunc)
 	}
 
@@ -293,24 +292,24 @@ func (noUntilOption) String() string {
 	return "NoUntil()"
 }
 
-func Until(now func() time.Time, jitter, max time.Duration) Option {
+func Until(now func() time.Time, jitter, maxDuration time.Duration) Option {
 	return untilOption{
-		now:    now,
-		jitter: jitter,
-		max:    max,
+		now:         now,
+		jitter:      jitter,
+		maxDuration: maxDuration,
 	}
 }
 
 type untilOption struct {
-	now    func() time.Time
-	jitter time.Duration
-	max    time.Duration
+	now         func() time.Time
+	jitter      time.Duration
+	maxDuration time.Duration
 }
 
 func (u untilOption) Validate(i any) error {
 	switch r := i.(type) {
 	case *RegistrationV1:
-		return r.CheckUntil(u.now, u.jitter, u.max)
+		return r.CheckUntil(u.now, u.jitter, u.maxDuration)
 	case *RegistrationV2:
 		return fmt.Errorf("%w: RegistrationV2 does not use an Until field", ErrInvalidType)
 	default:
@@ -319,5 +318,5 @@ func (u untilOption) Validate(i any) error {
 }
 
 func (u untilOption) String() string {
-	return fmt.Sprintf("untilOption(%v, %v, %v)", u.jitter.String(), u.max.String(), u.now().String())
+	return fmt.Sprintf("untilOption(%v, %v, %v)", u.jitter.String(), u.maxDuration.String(), u.now().String())
 }

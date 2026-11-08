@@ -24,7 +24,7 @@ func (ide *InvalidDurationError) Error() string {
 // CustomDuration is a custom type for time.Duration that allows for
 // unmarshaling from a string or int.  If unmarshaling from a string,
 // the string must be parsable by time.ParseDuration.  If unmarshaling
-// from an int, the int is assumed to be in seconds. Wes
+// from an int, the int is assumed to be in seconds. Wes.
 type CustomDuration time.Duration
 
 func (cd CustomDuration) String() string {
@@ -39,26 +39,20 @@ func (cd CustomDuration) MarshalJSON() ([]byte, error) {
 	return d.Bytes(), nil
 }
 
-func (cd *CustomDuration) UnmarshalJSON(b []byte) (err error) {
-	if b[0] == '"' {
-		var d time.Duration
-		d, err = time.ParseDuration(string(b[1 : len(b)-1]))
-		if err == nil {
+func (cd *CustomDuration) UnmarshalJSON(b []byte) error {
+	if len(b) > 0 && b[0] == '"' {
+		if d, err := time.ParseDuration(string(b[1 : len(b)-1])); err == nil {
 			*cd = CustomDuration(d)
-			return
+			return nil
 		}
 	}
 
-	var d int64
-	d, err = strconv.ParseInt(string(b), 10, 64)
-	if err == nil {
+	if d, err := strconv.ParseInt(string(b), 10, 64); err == nil {
 		*cd = CustomDuration(time.Duration(d) * time.Second)
-		return
+		return nil
 	}
 
-	err = &InvalidDurationError{
+	return &InvalidDurationError{
 		Value: string(b),
 	}
-
-	return
 }

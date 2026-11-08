@@ -90,5 +90,4 @@ func TestMarshalJSON(t *testing.T) {
 			assert.Error(err)
 		})
 	}
-
 }
